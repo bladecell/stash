@@ -34,7 +34,7 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
       Mockups: https://claude.ai/artifact/R4chgyCGHvgDaM7aymY1Nf
 - [x] 1. Window, tabs, search, keyboard nav, paste on Enter, delete, history from DMS
 - [x] 2. SQLite: new items, inline edit, external editor, notes/snippets/custom tabs, migration
-- [~] 3. Slots + IPC + niri-binds button
+- [x] 3. Slots + IPC + niri-binds button
 - [ ] 4. Custom commands
 - [ ] 5. Encrypted tabs
 - [ ] 6. Settings page + polish
