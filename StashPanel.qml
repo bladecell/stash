@@ -445,9 +445,8 @@ Rectangle {
     case Qt.Key_PageUp: move(-8); break;
     case Qt.Key_Home: move(-items.length); break;
     case Qt.Key_End: move(items.length); break;
-    case Qt.Key_Tab:
+    case Qt.Key_Tab:      // Tab / Ctrl+Tab next, Shift+Tab / Ctrl+Shift+Tab previous
     case Qt.Key_Backtab:
-      if (!ctrl) return;
       cycleTab(event.key === Qt.Key_Backtab || shift ? -1 : 1);
       break;
     case Qt.Key_Left:

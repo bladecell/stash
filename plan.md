@@ -52,4 +52,4 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 - DMS `clipboard.editEntry` replaces the entry: the edited text becomes a new newest entry with a new id.
 - Collections DB: `~/.local/share/quickshell/QML/OfflineStorage/Databases/<md5>.sqlite` (Qt LocalStorage "stash").
 - Keys: F2/^E edit, ^S save, Esc cancel, ^O external editor, ^N new item, ^T new tab, ^R rename tab,
-  ^⇧Del delete tab (press twice). IPC: `openTab <label|id>`.
+  ^⇧Del delete tab (press twice), Tab/⇧Tab (± Ctrl) switch tabs. IPC: `openTab <label|id>`.
