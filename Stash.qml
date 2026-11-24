@@ -1,9 +1,9 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import qs.Common
 import qs.Services
+import qs.Widgets
 
 Item {
   id: root
@@ -11,6 +11,7 @@ Item {
   property string pluginId: "stash"
 
   property bool open: false
+  onOpenChanged: win.visible = open
   property bool terminalTarget: false
 
   History {
@@ -18,14 +19,8 @@ Item {
     active: root.open
   }
 
-  function focusedScreen() {
-    const name = NiriService.currentOutput;
-    return Quickshell.screens.find(s => s.name === name) || Quickshell.screens[0];
-  }
-
   function show() {
-    terminalTarget = history.terminalFocused();  // decide before our overlay takes focus
-    win.screen = focusedScreen();
+    terminalTarget = history.terminalFocused();  // decide before our window takes focus
     if (history.dirty)
       history.refresh();
     open = true;
@@ -62,28 +57,35 @@ Item {
     function close(): string { root.hide(); return "closed"; }
   }
 
-  PanelWindow {
+  // Regular xdg toplevel so niri can move/resize it; the "org.quickshell" floating rule applies.
+  DFloatingWindow {
     id: win
-    visible: root.open
-    color: "transparent"
-    anchors { left: true; right: true; top: true; bottom: true }
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    WlrLayershell.namespace: "dms-stash"
-    WlrLayershell.exclusionMode: ExclusionMode.Ignore
+    title: "Stash"
+    visible: false
+    onVisibleChanged: if (!visible && root.open) root.hide()  // closed by the compositor (e.g. Mod+Q)
+    implicitWidth: root.pluginService ? root.pluginService.loadPluginData("stash", "windowWidth", 560) : 560
+    implicitHeight: root.pluginService ? root.pluginService.loadPluginData("stash", "windowHeight", 480) : 480
+    minimumSize: Qt.size(380, 300)
 
-    MouseArea {
-      anchors.fill: parent
-      onClicked: root.hide()
+    onWidthChanged: saveSize.restart()
+    onHeightChanged: saveSize.restart()
+    Timer {
+      id: saveSize
+      interval: 800
+      onTriggered: if (root.open && root.pluginService) {
+        root.pluginService.savePluginData("stash", "windowWidth", Math.round(win.width));
+        root.pluginService.savePluginData("stash", "windowHeight", Math.round(win.height));
+      }
     }
 
     StashPanel {
       id: panel
-      anchors.centerIn: parent
+      anchors.fill: parent
       history: history
       onCloseRequested: root.hide()
       onPasteRequested: (entry, textOnly) => root.paste(entry, textOnly)
-      MouseArea { anchors.fill: parent; z: -1 }  // swallow clicks so the backdrop doesn't close
+      // CopyQ-like: close when focus moves to another window
+      Window.onActiveChanged: if (!Window.active && root.open) root.hide()
     }
   }
 }

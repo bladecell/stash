@@ -45,12 +45,7 @@ Rectangle {
     tabIndex = (tabIndex + delta + tabs.length) % tabs.length;
   }
 
-  width: 560
-  height: 480
-  radius: Theme.cornerRadiusL
   color: Theme.surfaceContainer
-  border.width: 1
-  border.color: Theme.outlineVariant
   clip: true
 
   // Rail
@@ -59,8 +54,6 @@ Rectangle {
     width: 52
     height: parent.height
     color: Theme.surface
-    radius: panel.radius
-    Rectangle { anchors.right: parent.right; width: parent.radius; height: parent.height; color: parent.color }
     Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.outlineVariant }
 
     Column {
