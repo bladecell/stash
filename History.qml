@@ -140,6 +140,40 @@ QtObject {
     onTriggered: DMSService.sendRequest("clipboard.sendPaste", { "shift": shift }, root._after(null))
   }
 
+  // Untruncated text for editing (fullText caps at 600 chars for previews).
+  function loadFull(e, cb) {
+    DMSService.sendRequest("clipboard.getEntry", { "id": e.id }, response => {
+      const r = response.result;
+      if (r && r.data !== undefined)
+        cb(r.data);
+    });
+  }
+
+  // Rewrites a history entry; DMS replaces it with a new newest entry (new id), passed to done.
+  function edit(e, text, done) {
+    DMSService.sendRequest("clipboard.editEntry", { "id": e.id, "text": text }, _after(() => {
+      delete root.textCache[e.id];
+      refresh();
+      if (done)
+        DMSService.sendRequest("clipboard.search", { "limit": 1, "offset": 0 }, r => {
+          const top = ((r.result || {}).entries || [])[0];
+          if (top) done(top);
+        });
+    }));
+  }
+
+  function copyText(text, done) {
+    DMSService.sendRequest("clipboard.copy", { "text": text }, _after(done));
+  }
+
+  function pasteText(text, terminal, beforePaste) {
+    copyText(text, () => {
+      beforePaste && beforePaste();
+      pasteTimer.shift = terminal;
+      pasteTimer.restart();
+    });
+  }
+
   function setPinned(e, pinned) {
     DMSService.sendRequest(pinned ? "clipboard.pinEntry" : "clipboard.unpinEntry", { "id": e.id }, _after(() => refresh()));
   }

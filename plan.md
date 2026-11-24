@@ -33,7 +33,8 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
       text up to 3 lines (code in mono), color rows with filled swatch + hex + rgb.
       Mockups: https://claude.ai/artifact/R4chgyCGHvgDaM7aymY1Nf
 - [x] 1. Window, tabs, search, keyboard nav, paste on Enter, delete, history from DMS
-- [ ] 2. SQLite: new items, inline edit, external editor, notes/snippets/custom tabs, migration
+- [~] 2. SQLite: new items, inline edit, external editor, notes/snippets/custom tabs, migration
+      (built + store/editor self-tested; keyboard flows await user check; then remove dux-copyq)
 - [ ] 3. Slots + IPC + niri-binds button
 - [ ] 4. Custom commands
 - [ ] 5. Encrypted tabs
@@ -48,3 +49,7 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 - `dms ipc call plugins reload stash` only re-reads `Stash.qml`; changes to other QML/JS files need `dms restart`.
 - Window surface uses `Theme.popupTransparency` (floating-window transparency defaults to opaque); niri's
   all-windows blur rule shows through. DMS rule `dms-window-opaque` forces opacity 1.0 for `dev.duxlabs.shell`.
+- DMS `clipboard.editEntry` replaces the entry: the edited text becomes a new newest entry with a new id.
+- Collections DB: `~/.local/share/quickshell/QML/OfflineStorage/Databases/<md5>.sqlite` (Qt LocalStorage "stash").
+- Keys: F2/^E edit, ^S save, Esc cancel, ^O external editor, ^N new item, ^T new tab, ^R rename tab,
+  ^⇧Del delete tab (press twice). IPC: `openTab <label|id>`.

@@ -19,6 +19,15 @@ Item {
     active: root.open
   }
 
+  Store {
+    id: store
+  }
+
+  ExternalEditor {
+    id: externalEditor
+    command: root.pluginService ? root.pluginService.loadPluginData("stash", "editorCommand", "") : ""
+  }
+
   function show() {
     terminalTarget = history.terminalFocused();  // decide before our window takes focus
     if (history.dirty)
@@ -30,6 +39,7 @@ Item {
   function hide() {
     open = false;
     history.commitDelete();
+    store.lastDeleted = null;
   }
 
   function toggle() {
@@ -37,7 +47,10 @@ Item {
   }
 
   function paste(entry, textOnly) {
-    history.paste(entry, textOnly, terminalTarget, () => hide());
+    if (entry.collection)
+      history.pasteText(entry.preview, terminalTarget, () => hide());
+    else
+      history.paste(entry, textOnly, terminalTarget, () => hide());
   }
 
   // Preload history once DMS is up so the first open is instant.
@@ -55,6 +68,13 @@ Item {
     function toggle(): string { root.toggle(); return root.open ? "opened" : "closed"; }
     function open(): string { root.show(); return "opened"; }
     function close(): string { root.hide(); return "closed"; }
+    function openTab(name: string): string {
+      root.show();
+      const i = panel.tabs.findIndex(t => t.label.toLowerCase() === name.toLowerCase() || t.id === name);
+      if (i < 0) return "no tab " + name;
+      panel.tabIndex = i;
+      return "opened " + panel.tabs[i].label;
+    }
   }
 
   // Regular xdg toplevel so niri can move/resize it; the "org.quickshell" floating rule applies.
@@ -83,6 +103,8 @@ Item {
       id: panel
       anchors.fill: parent
       history: history
+      store: store
+      onExternalRequested: (text, ext, onSave) => externalEditor.open(text, ext, onSave)
       onCloseRequested: root.hide()
       onPasteRequested: (entry, textOnly) => root.paste(entry, textOnly)
       // CopyQ-like: close when focus moves to another window

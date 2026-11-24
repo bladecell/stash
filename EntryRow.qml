@@ -8,8 +8,12 @@ Item {
   required property int index
   property var history
   property bool selected: false
+  property bool editing: false
   signal activated(var entry)
   signal hovered(int index)
+  signal saveRequested(var entry, string text, string lang)
+  signal cancelRequested
+  signal externalRequested(var entry, string text, string lang)
 
   readonly property var e: modelData
   readonly property string kind: e.kind
@@ -20,7 +24,8 @@ Item {
     "image": { icon: "image", tint: Theme.error, label: "Image" },
     "color": { icon: "palette", tint: Theme.primary, label: "Color" },
     "email": { icon: "envelope", tint: Theme.secondary, label: "Email" },
-    "path": { icon: "folder", tint: Theme.surfaceVariantText, label: "Path" }
+    "path": { icon: "folder", tint: Theme.surfaceVariantText, label: "Path" },
+    "note": { icon: "note-sticky", tint: Theme.primary, label: "Note" }
   })
   readonly property var k: kinds[kind] || kinds.text
   readonly property var swatch: kind === "color" ? C.parseColor(e.preview) : null
@@ -28,21 +33,34 @@ Item {
   // Full text only for entries whose preview DMS truncated (≈100 chars, newlines collapsed).
   property string body: e.preview || ""
   property string thumb: ""
-  readonly property bool needsFull: kind !== "image" && e.size > 100
+  readonly property bool needsFull: !e.collection && kind !== "image" && e.size > 100
 
   function load() {
     if (kind === "image") {
-      thumb = history.image(e, url => { if (row.e && row.e.kind === "image") row.thumb = url; }) || "";
+      const id = e.id;  // the row may be destroyed or reused before the load lands
+      thumb = history.image(e, url => { if (row && row.e && row.e.id === id) row.thumb = url; }) || "";
     } else if (needsFull) {
-      const t = history.fullText(e, t2 => row.body = t2);
+      const id = e.id;
+      const t = history.fullText(e, t2 => { if (row && row.e && row.e.id === id) row.body = t2; });
       body = t !== null ? t : (e.preview || "");
     } else {
       body = e.preview || "";
     }
   }
-  Component.onCompleted: load()
+  Component.onCompleted: { load(); if (editing) startEdit(); }
   ListView.onReused: { thumb = ""; load(); }
   onModelDataChanged: load()
+  onEditingChanged: if (editing) startEdit()
+
+  // Load the untruncated text, then hand focus to the editor.
+  function startEdit() {
+    editor.text = e.preview || "";
+    langInput.text = e.lang || "";
+    if (!e.collection && e.size > 100)
+      history.loadFull(e, t => { if (row.editing) editor.text = t; });
+    editor.forceActiveFocus();
+    editor.cursorPosition = editor.length;
+  }
 
   width: ListView.view ? ListView.view.width : 400
   implicitHeight: content.implicitHeight + 18
@@ -84,6 +102,17 @@ Item {
       width: content.width - 32 - 12 - num.width - 12
       spacing: 3
 
+      Text {
+        visible: !row.editing && !!row.e.title
+        width: parent.width
+        text: row.e.title || ""
+        color: Theme.surfaceText
+        font.family: Theme.fontFamily
+        font.pixelSize: 13
+        font.bold: true
+        elide: Text.ElideRight
+      }
+
       Rectangle {
         visible: row.kind === "image"
         width: 168
@@ -105,7 +134,7 @@ Item {
       }
 
       Text {
-        visible: row.kind !== "image"
+        visible: row.kind !== "image" && !row.editing
         width: parent.width
         text: row.kind === "color" ? row.body.trim() + "  <font color='" + Theme.surfaceVariantText + "'>" + C.rgbLabel(row.swatch) + "</font>" : row.body
         textFormat: row.kind === "color" ? Text.StyledText : Text.PlainText
@@ -113,14 +142,85 @@ Item {
         font.family: row.kind === "code" || row.kind === "path" ? Theme.monoFontFamily : Theme.fontFamily
         font.pixelSize: 13
         wrapMode: Text.WrapAnywhere
-        maximumLineCount: 3
+        maximumLineCount: row.e.title ? 2 : 3
         elide: Text.ElideRight
         lineHeight: 1.15
       }
 
-      Text {
+      Rectangle {
+        visible: row.editing
         width: parent.width
-        text: (row.e.pinned ? "★ " : "") + row.k.label + (row.kind === "image" ? " · " + C.imageLabel(row.e.preview) + " · " + C.fmtSize(row.e.size) : "") + " · " + C.age(row.e.timestamp)
+        height: Math.min(220, Math.max(96, editor.contentHeight + 20))
+        radius: 8
+        color: Theme.withAlpha(Theme.surfaceContainerHigh, 0.7)
+        border.width: 1
+        border.color: Theme.primary
+        Flickable {
+          id: flick
+          anchors.fill: parent
+          anchors.margins: 10
+          contentHeight: editor.contentHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          function ensureVisible(r) {
+            if (contentY >= r.y) contentY = r.y;
+            else if (contentY + height <= r.y + r.height) contentY = r.y + r.height - height;
+          }
+          TextEdit {
+            id: editor
+            width: flick.width
+            wrapMode: TextEdit.Wrap
+            color: Theme.surfaceText
+            selectionColor: Theme.primarySelected
+            font.family: row.kind === "note" || row.kind === "text" ? Theme.fontFamily : Theme.monoFontFamily
+            font.pixelSize: 12
+            onCursorRectangleChanged: flick.ensureVisible(cursorRectangle)
+            Keys.onPressed: event => row.editorKey(event)
+          }
+        }
+      }
+
+      Row {
+        visible: row.editing
+        spacing: 10
+        Rectangle {
+          visible: !!row.e.collection
+          width: 90
+          height: 22
+          radius: 6
+          color: Theme.withAlpha(Theme.surfaceContainerHigh, 0.7)
+          TextInput {
+            id: langInput
+            anchors.fill: parent
+            anchors.leftMargin: 7
+            verticalAlignment: TextInput.AlignVCenter
+            color: Theme.surfaceText
+            font.family: Theme.monoFontFamily
+            font.pixelSize: 11
+            clip: true
+            Keys.onPressed: event => row.editorKey(event)
+            Text {
+              visible: !langInput.text
+              anchors.verticalCenter: parent.verticalCenter
+              text: "language"
+              color: Theme.surfaceVariantText
+              font: langInput.font
+            }
+          }
+        }
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          text: "^S save · Esc cancel · ^O open in editor" + (row.e.collection ? " · Tab language" : "")
+          color: Theme.surfaceVariantText
+          font.family: Theme.fontFamily
+          font.pixelSize: 11
+        }
+      }
+
+      Text {
+        visible: !row.editing
+        width: parent.width
+        text: (row.e.pinned ? "★ " : "") + row.k.label + (row.e.lang ? " · " + row.e.lang : "") + (row.kind === "image" ? " · " + C.imageLabel(row.e.preview) + " · " + C.fmtSize(row.e.size) : "") + " · " + C.age(row.e.timestamp)
         color: Theme.surfaceVariantText
         font.family: Theme.fontFamily
         font.pixelSize: 11
@@ -139,9 +239,26 @@ Item {
     }
   }
 
+  function editorKey(event) {
+    const ctrl = event.modifiers & Qt.ControlModifier;
+    if (event.key === Qt.Key_Escape) {
+      cancelRequested();
+    } else if (ctrl && event.key === Qt.Key_S) {
+      saveRequested(e, editor.text, langInput.text.trim());
+    } else if (ctrl && event.key === Qt.Key_O) {
+      externalRequested(e, editor.text, langInput.text.trim());
+    } else if (event.key === Qt.Key_Tab && e.collection) {
+      (editor.activeFocus ? langInput : editor).forceActiveFocus();
+    } else {
+      return;
+    }
+    event.accepted = true;
+  }
+
   MouseArea {
     id: mouse
     anchors.fill: parent
+    enabled: !row.editing
     hoverEnabled: true
     onPositionChanged: row.hovered(row.index)
     onClicked: row.activated(row.e)
