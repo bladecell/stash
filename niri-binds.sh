@@ -2,9 +2,9 @@
 # Writes Stash's global binds to <niri dir>/stash-binds.kdl and includes it from config.kdl.
 # Keys already bound elsewhere are skipped. Rolls back if `niri validate` rejects the result.
 # Usage: niri-binds.sh [slot-modifier] [cycle-key] [niri-config-dir]
-#   slot-modifier default Mod+Alt; cycle-key default Mod+Alt+C, "none" to skip
+#   slot-modifier default Mod+Alt; cycle-key default Mod+C, "none" to skip
 mod=${1:-Mod+Alt}
-cyc=${2:-Mod+Alt+C}
+cyc=${2:-Mod+C}
 case $mod in *[!A-Za-z+_]*|"") echo "Invalid modifier: $mod"; exit 1;; esac
 case $cyc in *[!A-Za-z0-9+_]*|"") echo "Invalid key: $cyc"; exit 1;; esac
 mod=${mod%+}
@@ -25,8 +25,8 @@ skipped=""
 {
   echo "// Written by the Stash DMS plugin (Settings → Write niri binds). Rewriting replaces this file."
   echo "binds {"
-  if taken 'Alt\+V'; then skipped="$skipped Alt+V"
-  else echo '    Alt+V hotkey-overlay-title="Stash" { spawn "dms" "ipc" "call" "stash" "toggle"; }'; fi
+  if taken 'Mod\+V'; then skipped="$skipped Mod+V"
+  else echo '    Mod+V hotkey-overlay-title="Stash" { spawn "dms" "ipc" "call" "stash" "toggle"; }'; fi
   if [ "$cyc" != none ]; then
     if taken "$(printf %s "$cyc" | sed 's/+/\\+/g')"; then skipped="$skipped $cyc"
     else echo "    $cyc hotkey-overlay-title=\"Stash: copy next older entry\" { spawn \"dms\" \"ipc\" \"call\" \"stash\" \"cycle\"; }"; fi
