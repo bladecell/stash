@@ -12,7 +12,22 @@ Item {
 
   property bool open: false
   property bool terminalTarget: false
+  property bool closeOnFocusLoss: setting("closeOnFocusLoss", false)
   property bool hadFocus: false  // showing the window emits a spurious inactive change; ignore until focused once
+
+  function setting(key, fallback) {
+    return pluginService ? pluginService.loadPluginData("stash", key, fallback) : fallback;
+  }
+
+  // Settings page writes through PluginService; re-read on change.
+  Connections {
+    target: root.pluginService
+    function onPluginDataChanged(id) {
+      if (id !== "stash") return;
+      root.closeOnFocusLoss = root.setting("closeOnFocusLoss", false);
+      externalEditor.command = root.setting("editorCommand", "");
+    }
+  }
 
   History {
     id: history
@@ -25,7 +40,7 @@ Item {
 
   ExternalEditor {
     id: externalEditor
-    command: root.pluginService ? root.pluginService.loadPluginData("stash", "editorCommand", "") : ""
+    command: root.setting("editorCommand", "")
   }
 
   function show() {
@@ -113,7 +128,7 @@ Item {
       // CopyQ-like: close when focus moves to another window
       Window.onActiveChanged: {
         if (Window.active) root.hadFocus = true;
-        else if (root.hadFocus && root.open) root.hide();
+        else if (root.closeOnFocusLoss && root.hadFocus && root.open) root.hide();
       }
     }
   }

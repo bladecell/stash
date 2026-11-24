@@ -6,8 +6,16 @@
   "author": "bladecell",
   "icon": "content_paste",
   "type": "daemon",
-  "capabilities": ["daemon", "ipc"],
+  "capabilities": [
+    "daemon",
+    "ipc"
+  ],
   "component": "./Stash.qml",
-  "permissions": ["settings_read", "settings_write", "process"],
+  "settings": "./StashSettings.qml",
+  "permissions": [
+    "settings_read",
+    "settings_write",
+    "process"
+  ],
   "requires_dms": ">=1.2.0"
 }
