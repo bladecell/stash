@@ -32,7 +32,7 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 - [x] 0. Five HTML mockups → picked **2 · Icon side rail**, plus rich rows: image thumbnails (~168×94),
       text up to 3 lines (code in mono), color rows with filled swatch + hex + rgb.
       Mockups: https://claude.ai/artifact/R4chgyCGHvgDaM7aymY1Nf
-- [~] 1. Window, tabs, search, keyboard nav, paste on Enter, delete, history from DMS
+- [x] 1. Window, tabs, search, keyboard nav, paste on Enter, delete, history from DMS
 - [ ] 2. SQLite: new items, inline edit, external editor, notes/snippets/custom tabs, migration
 - [ ] 3. Slots + IPC + niri-binds button
 - [ ] 4. Custom commands
