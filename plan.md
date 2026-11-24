@@ -33,8 +33,7 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
       text up to 3 lines (code in mono), color rows with filled swatch + hex + rgb.
       Mockups: https://claude.ai/artifact/R4chgyCGHvgDaM7aymY1Nf
 - [x] 1. Window, tabs, search, keyboard nav, paste on Enter, delete, history from DMS
-- [~] 2. SQLite: new items, inline edit, external editor, notes/snippets/custom tabs, migration
-      (built + store/editor self-tested; keyboard flows await user check; then remove dux-copyq)
+- [x] 2. SQLite: new items, inline edit, external editor, notes/snippets/custom tabs, migration
 - [ ] 3. Slots + IPC + niri-binds button
 - [ ] 4. Custom commands
 - [ ] 5. Encrypted tabs
