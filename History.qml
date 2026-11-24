@@ -126,12 +126,18 @@ QtObject {
     DMSService.sendRequest("clipboard.copyEntry", { "id": e.id, "textOnly": !!textOnly }, _after(done));
   }
 
-  function paste(e, textOnly, terminal, beforePaste) {
+  // delay: ms before the paste keystroke (longer for global binds, so held modifiers are released)
+  function paste(e, textOnly, terminal, beforePaste, delay) {
     DMSService.sendRequest("clipboard.copyEntry", { "id": e.id, "textOnly": !!textOnly }, _after(() => {
       beforePaste && beforePaste();
-      pasteTimer.shift = terminal;
-      pasteTimer.restart();
+      _schedulePaste(terminal, delay);
     }));
+  }
+
+  function _schedulePaste(terminal, delay) {
+    pasteTimer.shift = terminal;
+    pasteTimer.interval = delay || 120;
+    pasteTimer.restart();
   }
 
   property Timer pasteTimer: Timer {
@@ -166,11 +172,18 @@ QtObject {
     DMSService.sendRequest("clipboard.copy", { "text": text }, _after(done));
   }
 
-  function pasteText(text, terminal, beforePaste) {
+  function pasteText(text, terminal, beforePaste, delay) {
     copyText(text, () => {
       beforePaste && beforePaste();
-      pasteTimer.shift = terminal;
-      pasteTimer.restart();
+      _schedulePaste(terminal, delay);
+    });
+  }
+
+  // Newest-first history entry n (1-based), fetched fresh so it is right even while the window is closed.
+  function nth(n, cb) {
+    DMSService.sendRequest("clipboard.search", { "limit": n, "offset": 0 }, r => {
+      const e = ((r.result || {}).entries || [])[n - 1];
+      cb(e || null);
     });
   }
 

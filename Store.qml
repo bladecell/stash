@@ -13,6 +13,7 @@ QtObject {
   property var items: ({})     // tabId → [row], newest first (row shape matches history entries)
   property int version: 0      // bumped on every change so filters re-run
   property var lastDeleted: null
+  property var slots: ({})     // slot number → dbId (unassigned slots paste history item N)
 
   function _open() {
     db = LocalStorage.openDatabaseSync("stash", "", "Stash collections", 64 * 1024 * 1024);
@@ -21,6 +22,7 @@ QtObject {
       tx.executeSql("CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY, tab_id INTEGER NOT NULL, title TEXT DEFAULT '', content TEXT NOT NULL DEFAULT '', lang TEXT DEFAULT '', created INTEGER, updated INTEGER)");
       tx.executeSql("CREATE INDEX IF NOT EXISTS items_tab ON items(tab_id, updated)");
       tx.executeSql("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)");
+      tx.executeSql("CREATE TABLE IF NOT EXISTS slots (n INTEGER PRIMARY KEY, item_id INTEGER NOT NULL)");
       if (tx.executeSql("SELECT COUNT(*) AS n FROM tabs").rows.item(0).n === 0) {
         tx.executeSql("INSERT INTO tabs (name, icon, pos) VALUES ('Notes', 'note-sticky', 0)");
         tx.executeSql("INSERT INTO tabs (name, icon, pos) VALUES ('Snippets', 'code', 1)");
@@ -34,13 +36,13 @@ QtObject {
     return {
       id: "db" + r.id, dbId: r.id, tabId: r.tab_id, collection: true,
       title: r.title || "", preview: r.content, lang: r.lang || "", size: r.content.length,
-      timestamp: new Date(r.updated).toISOString(),
+      timestamp: new Date(r.updated).toISOString(), slot: 0,
       kind: tabName === "Notes" ? "note" : tabName === "Snippets" ? "code" : C.kind({ preview: r.content.slice(0, 200) })
     };
   }
 
   function _load() {
-    const t = [], it = {};
+    const t = [], it = {}, sl = {}, byId = {};
     db.readTransaction(tx => {
       const tr = tx.executeSql("SELECT * FROM tabs ORDER BY pos, id").rows;
       for (let i = 0; i < tr.length; i++) {
@@ -54,11 +56,20 @@ QtObject {
       for (let i = 0; i < ir.length; i++) {
         const r = ir.item(i);
         if (it[r.tab_id])
-          it[r.tab_id].push(_row(r, names[r.tab_id]));
+          it[r.tab_id].push(byId[r.id] = _row(r, names[r.tab_id]));
+      }
+      const sr = tx.executeSql("SELECT * FROM slots").rows;
+      for (let i = 0; i < sr.length; i++) {
+        const s = sr.item(i);
+        if (byId[s.item_id]) {
+          sl[s.n] = s.item_id;
+          byId[s.item_id].slot = s.n;
+        }
       }
     });
     tabs = t;
     items = it;
+    slots = sl;
     version++;
   }
 
@@ -86,6 +97,27 @@ QtObject {
     return q ? list.filter(r => r.preview.toLowerCase().includes(q) || r.title.toLowerCase().includes(q)) : list;
   }
 
+  // Assign slot n (1–9) to an item; n = 0 clears the item's slot. One item per slot.
+  function setSlot(n, dbId) {
+    db.transaction(tx => {
+      tx.executeSql("DELETE FROM slots WHERE item_id = ?", [dbId]);
+      if (n > 0)
+        tx.executeSql("INSERT OR REPLACE INTO slots (n, item_id) VALUES (?, ?)", [n, dbId]);
+    });
+    _load();
+  }
+
+  function slotItem(n) {
+    const id = slots[n];
+    if (!id)
+      return null;
+    for (const k in items) {
+      const r = items[k].find(x => x.dbId === id);
+      if (r) return r;
+    }
+    return null;
+  }
+
   function addTab(name, icon) {
     let id = 0;
     db.transaction(tx => {
@@ -103,6 +135,7 @@ QtObject {
 
   function deleteTab(id) {
     db.transaction(tx => {
+      tx.executeSql("DELETE FROM slots WHERE item_id IN (SELECT id FROM items WHERE tab_id = ?)", [id]);
       tx.executeSql("DELETE FROM items WHERE tab_id = ?", [id]);
       tx.executeSql("DELETE FROM tabs WHERE id = ?", [id]);
     });

@@ -64,6 +64,18 @@ Item {
     open ? hide() : show();
   }
 
+  // Global slot paste (niri bind → IPC). Assigned slot → that item; otherwise history item n.
+  function pasteSlot(n) {
+    if (open)
+      hide();
+    const terminal = history.terminalFocused();
+    const item = store.slotItem(n);
+    if (item)
+      history.pasteText(item.preview, terminal, null, 250);
+    else
+      history.nth(n, e => { if (e) history.paste(e, false, terminal, null, 250); });
+  }
+
   function paste(entry, textOnly) {
     if (entry.collection)
       history.pasteText(entry.preview, terminalTarget, () => hide());
@@ -86,6 +98,19 @@ Item {
     function toggle(): string { root.toggle(); return root.open ? "opened" : "closed"; }
     function open(): string { root.show(); return "opened"; }
     function close(): string { root.hide(); return "closed"; }
+    function pasteSlot(n: int): string {
+      if (n < 1 || n > 9) return "slot must be 1-9";
+      root.pasteSlot(n);
+      return "slot " + n;
+    }
+    function slots(): string {
+      const out = [];
+      for (let n = 1; n <= 9; n++) {
+        const it = store.slotItem(n);
+        out.push(n + ": " + (it ? (it.title || it.preview.split("\n")[0]).slice(0, 40) : "history #" + n));
+      }
+      return out.join("\n");
+    }
     function openTab(name: string): string {
       root.show();
       const i = panel.tabs.findIndex(t => t.label.toLowerCase() === name.toLowerCase() || t.id === name);

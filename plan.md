@@ -34,7 +34,7 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
       Mockups: https://claude.ai/artifact/R4chgyCGHvgDaM7aymY1Nf
 - [x] 1. Window, tabs, search, keyboard nav, paste on Enter, delete, history from DMS
 - [x] 2. SQLite: new items, inline edit, external editor, notes/snippets/custom tabs, migration
-- [ ] 3. Slots + IPC + niri-binds button
+- [~] 3. Slots + IPC + niri-binds button
 - [ ] 4. Custom commands
 - [ ] 5. Encrypted tabs
 - [ ] 6. Settings page + polish
@@ -52,3 +52,8 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 - Collections DB: `~/.local/share/quickshell/QML/OfflineStorage/Databases/<md5>.sqlite` (Qt LocalStorage "stash").
 - Keys: F2/^E edit, ^S save, Esc cancel, ^O external editor, ^N new item, ^T new tab, ^R rename tab,
   ^⇧Del delete tab (press twice), Tab/⇧Tab (± Ctrl) switch tabs. IPC: `openTab <label|id>`.
+- Slots: `slots` table (n → item). Unassigned slot N pastes history item N (fetched fresh). In-window
+  Ctrl+Shift+1–9 assigns the selected Notes/Snippets item, Ctrl+Shift+0 clears. IPC `pasteSlot N`, `slots`.
+  Global paste waits 250 ms so the bind's held modifiers are released before the Ctrl+V keystroke.
+- Digit keys fall back to the physical number row (XKB keycodes 10–19) for layouts like cz.
+- `niri-binds.sh [dir]`: writes `stash-binds.kdl`, adds the include, skips taken keys, rolls back on validate failure.

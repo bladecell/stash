@@ -414,8 +414,9 @@ Rectangle {
       Text {
         x: 14
         anchors.verticalCenter: parent.verticalCenter
-        readonly property bool alert: panel.confirmTabDelete !== 0 || panel.undoable
-        text: panel.confirmTabDelete ? "Ctrl+Shift+Del again deletes this tab and " + panel.baseItems.length + " items"
+        readonly property bool alert: panel.confirmTabDelete !== 0 || panel.undoable || !!panel.notice
+        text: panel.notice ? panel.notice
+            : panel.confirmTabDelete ? "Ctrl+Shift+Del again deletes this tab and " + panel.baseItems.length + " items"
             : panel.undoable ? "Deleted · Ctrl+Z to undo"
             : panel.items.length ? (panel.current + 1) + " of " + panel.items.length.toLocaleString() : ""
         color: panel.confirmTabDelete ? Theme.error : alert ? Theme.primary : Theme.surfaceVariantText
@@ -423,7 +424,7 @@ Rectangle {
         font.pixelSize: 11
       }
       Text {
-        visible: !panel.confirmTabDelete
+        visible: !panel.confirmTabDelete && !panel.notice
         anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
         text: panel.tab.collection ? "⏎ paste · F2 edit · ^N new · Del delete" : "⏎ paste · F2 edit · Del delete · ^P pin"
         color: Theme.surfaceVariantText
@@ -431,6 +432,37 @@ Rectangle {
         font.pixelSize: 11
       }
     }
+  }
+
+  // Digit 0–9 from the key, or from the physical number row (non-US layouts, e.g. cz types ěšč…).
+  function digitOf(event) {
+    if (event.key >= Qt.Key_0 && event.key <= Qt.Key_9)
+      return event.key - Qt.Key_0;
+    const sc = event.nativeScanCode;  // XKB keycode = evdev + 8: 1..9 → 10..18, 0 → 19
+    return sc >= 10 && sc <= 18 ? sc - 9 : sc === 19 ? 0 : -1;
+  }
+
+  property string notice: ""
+  Timer {
+    id: noticeTimer
+    interval: 3000
+    onTriggered: panel.notice = ""
+  }
+  function notify(text) {
+    notice = text;
+    noticeTimer.restart();
+  }
+
+  function assignSlot(n) {
+    const e = selectedEntry;
+    if (!e || e.draft)
+      return;
+    if (!e.collection) {
+      notify("Slots hold Notes/Snippets items; unassigned slots paste history item N");
+      return;
+    }
+    store.setSlot(n, e.dbId);
+    notify(n ? "Ctrl+Alt+" + n + " now pastes this item" : "Slot cleared");
   }
 
   function handleKey(event) {
@@ -501,13 +533,19 @@ Rectangle {
       if (!ctrl || !e || e.collection) return;
       history.setPinned(e, !e.pinned);
       break;
-    default:
-      if (alt && event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
-        const target = items[event.key - Qt.Key_1];
+    default: {
+      const d = digitOf(event);
+      if (ctrl && shift && d >= 0) {
+        assignSlot(d);
+        break;
+      }
+      if (alt && !ctrl && d >= 1) {
+        const target = items[d - 1];
         if (target) pasteRequested(target, false);
         break;
       }
       return;
+    }
     }
     event.accepted = true;
   }

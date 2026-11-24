@@ -260,7 +260,7 @@ Item {
       Text {
         visible: !row.editing
         width: parent.width
-        text: (row.e.pinned ? "★ " : "") + row.k.label + (row.e.lang ? " · " + row.e.lang : "") + (row.kind === "image" ? " · " + C.imageLabel(row.e.preview) + " · " + C.fmtSize(row.e.size) : "") + " · " + C.age(row.e.timestamp)
+        text: (row.e.pinned ? "★ " : "") + (row.e.slot ? "Slot " + row.e.slot + " · " : "") + row.k.label + (row.e.lang ? " · " + row.e.lang : "") + (row.kind === "image" ? " · " + C.imageLabel(row.e.preview) + " · " + C.fmtSize(row.e.size) : "") + " · " + C.age(row.e.timestamp)
         color: Theme.surfaceVariantText
         font.family: Theme.fontFamily
         font.pixelSize: 11
