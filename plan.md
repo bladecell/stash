@@ -42,3 +42,9 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 ## Open items
 
 - Icons: FA Pro SVGs copied into repo (repo is private — keep it private).
+
+## Dev notes
+
+- `dms ipc call plugins reload stash` only re-reads `Stash.qml`; changes to other QML/JS files need `dms restart`.
+- Window surface uses `Theme.popupTransparency` (floating-window transparency defaults to opaque); niri's
+  all-windows blur rule shows through. DMS rule `dms-window-opaque` forces opacity 1.0 for `dev.duxlabs.shell`.

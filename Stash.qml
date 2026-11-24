@@ -61,6 +61,7 @@ Item {
   DFloatingWindow {
     id: win
     title: "Stash"
+    surfaceColor: "transparent"
     visible: false
     onVisibleChanged: if (!visible && root.open) root.hide()  // closed by the compositor (e.g. Mod+Q)
     implicitWidth: root.pluginService ? root.pluginService.loadPluginData("stash", "windowWidth", 560) : 560

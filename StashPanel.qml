@@ -45,7 +45,8 @@ Rectangle {
     tabIndex = (tabIndex + delta + tabs.length) % tabs.length;
   }
 
-  color: Theme.surfaceContainer
+  // Popup transparency like the DMS launcher; niri's blur rule shows through.
+  color: Theme.withAlpha(Theme.surfaceContainer, Theme.popupTransparency)
   clip: true
 
   // Rail
@@ -53,7 +54,7 @@ Rectangle {
     id: rail
     width: 52
     height: parent.height
-    color: Theme.surface
+    color: Theme.withAlpha(Theme.surface, 0.35)
     Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.outlineVariant }
 
     Column {
@@ -139,7 +140,7 @@ Rectangle {
       anchors { top: header.bottom; topMargin: 10; left: parent.left; right: parent.right; leftMargin: 12; rightMargin: 12 }
       height: 36
       radius: 10
-      color: Theme.surfaceContainerHigh
+      color: Theme.withAlpha(Theme.surfaceContainerHigh, 0.6)
       Icon {
         x: 12
         anchors.verticalCenter: parent.verticalCenter
