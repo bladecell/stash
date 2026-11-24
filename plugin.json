@@ -1,0 +1,13 @@
+{
+  "id": "stash",
+  "name": "Stash",
+  "description": "CopyQ-style clipboard manager: history tabs, notes, snippets, slots, encrypted tabs.",
+  "version": "0.1.0",
+  "author": "bladecell",
+  "icon": "content_paste",
+  "type": "daemon",
+  "capabilities": ["daemon", "ipc"],
+  "component": "./Stash.qml",
+  "permissions": ["settings_read", "settings_write", "process"],
+  "requires_dms": ">=1.2.0"
+}
