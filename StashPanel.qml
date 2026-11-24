@@ -462,7 +462,7 @@ Rectangle {
       return;
     }
     store.setSlot(n, e.dbId);
-    notify(n ? "Ctrl+Alt+" + n + " now pastes this item" : "Slot cleared");
+    notify(n ? "Slot " + n + " now pastes this item" : "Slot cleared");
   }
 
   function handleKey(event) {

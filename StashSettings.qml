@@ -23,6 +23,15 @@ PluginSettings {
     defaultValue: ""
   }
 
+  StringSetting {
+    id: slotMod
+    settingKey: "slotModifier"
+    label: "Slot shortcut modifier"
+    description: "Modifier for the paste-slot binds (niri syntax, e.g. Mod+Alt, Mod+Ctrl, Ctrl+Alt). Click Write niri binds after changing it"
+    placeholder: "Mod+Alt"
+    defaultValue: "Mod+Alt"
+  }
+
   Column {
     width: parent.width
     spacing: 6
@@ -37,7 +46,7 @@ PluginSettings {
     Text {
       width: parent.width
       wrapMode: Text.Wrap
-      text: "Writes ~/.config/niri/stash-binds.kdl (Alt+V opens Stash, Ctrl+Alt+1–9 paste slots) and includes it from config.kdl. Keys already bound elsewhere are skipped; if niri rejects the config, nothing changes."
+      text: "Writes ~/.config/niri/stash-binds.kdl (Alt+V opens Stash, <modifier>+1–9 paste slots) and includes it from config.kdl. Keys already bound elsewhere are skipped; if niri rejects the config, nothing changes."
       color: Theme.surfaceVariantText
       font.pixelSize: Theme.fontSizeSmall
     }
@@ -61,7 +70,7 @@ PluginSettings {
       id: writer
       property string result: ""
       property bool ok: true
-      command: ["sh", decodeURIComponent(Qt.resolvedUrl("niri-binds.sh").toString().replace(/^file:\/\//, ""))]
+      command: ["sh", decodeURIComponent(Qt.resolvedUrl("niri-binds.sh").toString().replace(/^file:\/\//, "")), slotMod.value.trim() || "Mod+Alt"]
       stdout: StdioCollector { id: out }
       onExited: code => {
         ok = code === 0;

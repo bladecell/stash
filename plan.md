@@ -54,6 +54,6 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
   ^⇧Del delete tab (press twice), Tab/⇧Tab (± Ctrl) switch tabs. IPC: `openTab <label|id>`.
 - Slots: `slots` table (n → item). Unassigned slot N pastes history item N (fetched fresh). In-window
   Ctrl+Shift+1–9 assigns the selected Notes/Snippets item, Ctrl+Shift+0 clears. IPC `pasteSlot N`, `slots`.
-  Global paste waits 250 ms so the bind's held modifiers are released before the Ctrl+V keystroke.
+  Bind modifier is a setting (default Mod+Alt; Ctrl+Alt clashes with Ghostty). Global paste waits 250 ms so the bind's held modifiers are released before the Ctrl+V keystroke.
 - Digit keys fall back to the physical number row (XKB keycodes 10–19) for layouts like cz.
 - `niri-binds.sh [dir]`: writes `stash-binds.kdl`, adds the include, skips taken keys, rolls back on validate failure.

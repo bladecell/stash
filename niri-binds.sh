@@ -1,8 +1,11 @@
 #!/bin/sh
 # Writes Stash's global binds to <niri dir>/stash-binds.kdl and includes it from config.kdl.
 # Keys already bound elsewhere are skipped. Rolls back if `niri validate` rejects the result.
-# Usage: niri-binds.sh [niri-config-dir]
-dir=${1:-${XDG_CONFIG_HOME:-$HOME/.config}/niri}
+# Usage: niri-binds.sh [slot-modifier] [niri-config-dir]   (modifier default: Mod+Alt)
+mod=${1:-Mod+Alt}
+case $mod in *[!A-Za-z+_]*|"") echo "Invalid modifier: $mod"; exit 1;; esac
+mod=${mod%+}
+dir=${2:-${XDG_CONFIG_HOME:-$HOME/.config}/niri}
 cfg=$dir/config.kdl
 out=$dir/stash-binds.kdl
 [ -f "$cfg" ] || { echo "No niri config at $cfg"; exit 1; }
@@ -22,8 +25,8 @@ skipped=""
   if taken 'Alt\+V'; then skipped="$skipped Alt+V"
   else echo '    Alt+V hotkey-overlay-title="Stash" { spawn "dms" "ipc" "call" "stash" "toggle"; }'; fi
   for i in 1 2 3 4 5 6 7 8 9; do
-    if taken "Ctrl\+Alt\+$i"; then skipped="$skipped Ctrl+Alt+$i"
-    else echo "    Ctrl+Alt+$i hotkey-overlay-title=\"Stash: paste slot $i\" { spawn \"dms\" \"ipc\" \"call\" \"stash\" \"pasteSlot\" \"$i\"; }"; fi
+    if taken "$(printf %s "$mod" | sed 's/+/\\+/g')\+$i"; then skipped="$skipped $mod+$i"
+    else echo "    $mod+$i hotkey-overlay-title=\"Stash: paste slot $i\" { spawn \"dms\" \"ipc\" \"call\" \"stash\" \"pasteSlot\" \"$i\"; }"; fi
   done
   echo "}"
 } > "$out"
