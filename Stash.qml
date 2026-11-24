@@ -11,8 +11,8 @@ Item {
   property string pluginId: "stash"
 
   property bool open: false
-  onOpenChanged: win.visible = open
   property bool terminalTarget: false
+  property bool hadFocus: false  // showing the window emits a spurious inactive change; ignore until focused once
 
   History {
     id: history
@@ -33,11 +33,14 @@ Item {
     if (history.dirty)
       history.refresh();
     open = true;
+    hadFocus = false;
+    win.visible = true;
     panel.reset();
   }
 
   function hide() {
     open = false;
+    win.visible = false;
     history.commitDelete();
     store.lastDeleted = null;
   }
@@ -108,7 +111,10 @@ Item {
       onCloseRequested: root.hide()
       onPasteRequested: (entry, textOnly) => root.paste(entry, textOnly)
       // CopyQ-like: close when focus moves to another window
-      Window.onActiveChanged: if (!Window.active && root.open) root.hide()
+      Window.onActiveChanged: {
+        if (Window.active) root.hadFocus = true;
+        else if (root.hadFocus && root.open) root.hide();
+      }
     }
   }
 }

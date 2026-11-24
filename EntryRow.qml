@@ -11,9 +11,9 @@ Item {
   property bool editing: false
   signal activated(var entry)
   signal hovered(int index)
-  signal saveRequested(var entry, string text, string lang)
+  signal saveRequested(var entry, string text, string lang, string title)
   signal cancelRequested
-  signal externalRequested(var entry, string text, string lang)
+  signal externalRequested(var entry, string text, string lang, string title)
 
   readonly property var e: modelData
   readonly property string kind: e.kind
@@ -56,10 +56,11 @@ Item {
   function startEdit() {
     editor.text = e.preview || "";
     langInput.text = e.lang || "";
+    titleInput.text = e.title || "";
     if (!e.collection && e.size > 100)
       history.loadFull(e, t => { if (row.editing) editor.text = t; });
-    editor.forceActiveFocus();
     editor.cursorPosition = editor.length;
+    (e.draft && e.collection ? titleInput : editor).forceActiveFocus();
   }
 
   width: ListView.view ? ListView.view.width : 400
@@ -148,12 +149,51 @@ Item {
       }
 
       Rectangle {
+        visible: row.editing && !!row.e.collection
+        width: parent.width
+        height: 30
+        radius: 8
+        color: Theme.withAlpha(Theme.surfaceContainerHigh, 0.7)
+        border.width: titleInput.activeFocus ? 1 : 0
+        border.color: Theme.primary
+        TextInput {
+          id: titleInput
+          anchors.fill: parent
+          anchors.leftMargin: 10
+          anchors.rightMargin: 10
+          verticalAlignment: TextInput.AlignVCenter
+          color: Theme.surfaceText
+          selectionColor: Theme.primarySelected
+          font.family: Theme.fontFamily
+          font.pixelSize: 13
+          font.bold: true
+          clip: true
+          Accessible.name: "Title"
+          Keys.onPressed: event => {
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+              editor.forceActiveFocus();
+              event.accepted = true;
+            } else {
+              row.editorKey(event);
+            }
+          }
+          Text {
+            visible: !titleInput.text
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Title (optional)"
+            color: Theme.surfaceVariantText
+            font: titleInput.font
+          }
+        }
+      }
+
+      Rectangle {
         visible: row.editing
         width: parent.width
         height: Math.min(220, Math.max(96, editor.contentHeight + 20))
         radius: 8
         color: Theme.withAlpha(Theme.surfaceContainerHigh, 0.7)
-        border.width: 1
+        border.width: editor.activeFocus ? 1 : 0
         border.color: Theme.primary
         Flickable {
           id: flick
@@ -210,7 +250,7 @@ Item {
         }
         Text {
           anchors.verticalCenter: parent.verticalCenter
-          text: "^S save · Esc cancel · ^O open in editor" + (row.e.collection ? " · Tab language" : "")
+          text: "^S save · Esc cancel · ^O editor" + (row.e.collection ? " · Tab next" : "")
           color: Theme.surfaceVariantText
           font.family: Theme.fontFamily
           font.pixelSize: 11
@@ -244,11 +284,11 @@ Item {
     if (event.key === Qt.Key_Escape) {
       cancelRequested();
     } else if (ctrl && event.key === Qt.Key_S) {
-      saveRequested(e, editor.text, langInput.text.trim());
+      saveRequested(e, editor.text, langInput.text.trim(), titleInput.text.trim());
     } else if (ctrl && event.key === Qt.Key_O) {
-      externalRequested(e, editor.text, langInput.text.trim());
+      externalRequested(e, editor.text, langInput.text.trim(), titleInput.text.trim());
     } else if (event.key === Qt.Key_Tab && e.collection) {
-      (editor.activeFocus ? langInput : editor).forceActiveFocus();
+      (titleInput.activeFocus ? editor : editor.activeFocus ? langInput : titleInput).forceActiveFocus();
     } else {
       return;
     }

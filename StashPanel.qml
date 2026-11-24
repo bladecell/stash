@@ -92,42 +92,45 @@ Rectangle {
   }
 
   // Saves without touching UI state; also used for external-editor saves.
-  function persist(e, text, lang, onNewEntry) {
+  // title/lang undefined → left unchanged (collection items only)
+  function persist(e, text, lang, title, onNewEntry) {
     if (e.draft) {
       if (e.collection)
-        return { dbId: store.addItem(e.tabId, text, "", lang), collection: true };
+        return { dbId: store.addItem(e.tabId, text, title, lang), collection: true };
       if (text)
         history.copyText(text, null);
       return null;
     }
     if (e.collection)
-      store.updateItem(e.dbId, { content: text, lang: lang });
+      store.updateItem(e.dbId, { content: text, lang: lang, title: title });
     else
       history.edit(e, text, onNewEntry);
     return e;
   }
 
-  function saveEdit(e, text, lang) {
+  function saveEdit(e, text, lang, title) {
     editingId = "";
     draft = null;
-    persist(e, text, lang);
+    persist(e, text, lang, title);
     if (e.draft || !e.collection)
       current = 0;  // new and edited clipboard entries land at the top
     search.forceActiveFocus();
   }
 
-  function openExternal(e, text, lang) {
+  function openExternal(e, text, lang, title) {
     editingId = "";
     draft = null;
     let target = e;
     if (e.draft && e.collection)
-      target = persist(e, text, lang);
+      target = persist(e, text, lang, title);
+    else if (e.collection && !e.draft)
+      persist(e, text, lang, title);  // keep title/lang typed before Ctrl+O
     const ext = lang || (e.kind === "note" ? "md" : "txt");
     externalRequested(text, ext, t => {
       if (target.draft)
         history.copyText(t, null);  // new clipboard text: each save becomes the clipboard
       else
-        persist(target, t, target.collection ? undefined : "", ne => target = ne);
+        persist(target, t, undefined, undefined, ne => target = ne);
     });
   }
 
@@ -385,9 +388,9 @@ Rectangle {
         editing: panel.editingId !== "" && String(modelData.id) === panel.editingId
         onHovered: i => { if (!panel.editingId) panel.current = i; }
         onActivated: entry => panel.pasteRequested(entry, false)
-        onSaveRequested: (entry, text, lang) => panel.saveEdit(entry, text, lang)
+        onSaveRequested: (entry, text, lang, title) => panel.saveEdit(entry, text, lang, title)
         onCancelRequested: panel.cancelEdit()
-        onExternalRequested: (entry, text, lang) => panel.openExternal(entry, text, lang)
+        onExternalRequested: (entry, text, lang, title) => panel.openExternal(entry, text, lang, title)
       }
 
       Text {
