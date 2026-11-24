@@ -56,4 +56,5 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
   Ctrl+Shift+1–9 assigns the selected Notes/Snippets item, Ctrl+Shift+0 clears. IPC `pasteSlot N`, `slots`.
   Bind modifier is a setting (default Mod+Alt; Ctrl+Alt clashes with Ghostty). Global paste waits 250 ms so the bind's held modifiers are released before the Ctrl+V keystroke.
 - Digit keys fall back to the physical number row (XKB keycodes 10–19) for layouts like cz.
-- `niri-binds.sh [dir]`: writes `stash-binds.kdl`, adds the include, skips taken keys, rolls back on validate failure.
+- Cycle copy (IPC `cycle`, default bind Mod+Alt+C): each press copies the next older entry from a snapshot; resets 5 s after the last press.
+- `niri-binds.sh [slot-mod] [cycle-key|none] [dir]`: writes `stash-binds.kdl`, adds the include, skips taken keys, rolls back on validate failure.

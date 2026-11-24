@@ -32,6 +32,15 @@ PluginSettings {
     defaultValue: "Mod+Alt"
   }
 
+  StringSetting {
+    id: cycleKey
+    settingKey: "cycleKey"
+    label: "Copy-older-entry shortcut"
+    description: "Each press copies the next older clipboard entry (2nd, 3rd, …) so you can paste it. 'none' skips the bind. Click Write niri binds after changing it"
+    placeholder: "Mod+Alt+C"
+    defaultValue: "Mod+Alt+C"
+  }
+
   Column {
     width: parent.width
     spacing: 6
@@ -46,7 +55,7 @@ PluginSettings {
     Text {
       width: parent.width
       wrapMode: Text.Wrap
-      text: "Writes ~/.config/niri/stash-binds.kdl (Alt+V opens Stash, <modifier>+1–9 paste slots) and includes it from config.kdl. Keys already bound elsewhere are skipped; if niri rejects the config, nothing changes."
+      text: "Writes ~/.config/niri/stash-binds.kdl (Alt+V opens Stash, <modifier>+1–9 paste slots, the copy-older-entry key) and includes it from config.kdl. Keys already bound elsewhere are skipped; if niri rejects the config, nothing changes."
       color: Theme.surfaceVariantText
       font.pixelSize: Theme.fontSizeSmall
     }
@@ -70,7 +79,7 @@ PluginSettings {
       id: writer
       property string result: ""
       property bool ok: true
-      command: ["sh", decodeURIComponent(Qt.resolvedUrl("niri-binds.sh").toString().replace(/^file:\/\//, "")), slotMod.value.trim() || "Mod+Alt"]
+      command: ["sh", decodeURIComponent(Qt.resolvedUrl("niri-binds.sh").toString().replace(/^file:\/\//, "")), slotMod.value.trim() || "Mod+Alt", cycleKey.value.trim() || "Mod+Alt+C"]
       stdout: StdioCollector { id: out }
       onExited: code => {
         ok = code === 0;

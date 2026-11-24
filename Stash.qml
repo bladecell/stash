@@ -76,6 +76,51 @@ Item {
       history.nth(n, e => { if (e) history.paste(e, false, terminal, null, 250); });
   }
 
+  // Cycle copy: each press copies the next older entry. Copying moves an entry to the top, so walk a
+  // snapshot taken on the first press; the session ends 5 s after the last press.
+  property var cycleList: []
+  property int cycleIndex: 0
+  property int cyclePending: 0
+  property bool cycleFetching: false
+  Timer {
+    id: cycleReset
+    interval: 5000
+    onTriggered: root.cycleList = []
+  }
+
+  function cycleCopy() {
+    cycleReset.restart();
+    if (cycleList.length)
+      return _cycleStep();
+    cyclePending++;
+    if (cycleFetching)
+      return;
+    cycleFetching = true;
+    DMSService.sendRequest("clipboard.search", { "limit": 50, "offset": 0 }, r => {
+      root.cycleFetching = false;
+      root.cycleList = ((r.result || {}).entries || []).map(e => ({ id: e.id, preview: e.preview, isImage: e.isImage }));
+      root.cycleIndex = 0;
+      const n = root.cyclePending;
+      root.cyclePending = 0;
+      for (let i = 0; i < n && root.cycleList.length > 1; i++)
+        root._cycleStep();
+    });
+  }
+
+  function _cycleStep() {
+    if (cycleList.length < 2)
+      return;
+    cycleIndex = (cycleIndex + 1) % cycleList.length;  // wraps back to the original clipboard
+    const e = cycleList[cycleIndex];
+    const n = cycleIndex + 1;
+    DMSService.sendRequest("clipboard.copyEntry", { "id": e.id }, r => {
+      if (r.error)
+        ToastService.showError("Stash: " + r.error);
+      else
+        ToastService.showInfo("Clipboard #" + n + (e.isImage ? " (image)" : ": " + e.preview.slice(0, 60)));
+    });
+  }
+
   function paste(entry, textOnly) {
     if (entry.collection)
       history.pasteText(entry.preview, terminalTarget, () => hide());
@@ -102,6 +147,10 @@ Item {
       if (n < 1 || n > 9) return "slot must be 1-9";
       root.pasteSlot(n);
       return "slot " + n;
+    }
+    function cycle(): string {
+      root.cycleCopy();
+      return "ok";
     }
     function slots(): string {
       const out = [];
