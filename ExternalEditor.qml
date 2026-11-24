@@ -6,7 +6,7 @@ import Quickshell.Io
 // editor (or a configured command), and calls back on every save.
 QtObject {
   id: root
-  property string command: ""   // e.g. "zeditor --wait"; empty → xdg-open
+  property string command: ""   // e.g. "zeditor"; empty → $VISUAL/$EDITOR in a terminal, else xdg-open
   readonly property string dir: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/stash-edit"
   property int counter: 0
 
@@ -15,6 +15,7 @@ QtObject {
       property var saveCb: null
       property string last: ""
       watchChanges: true
+      printErrors: false  // first read races the initial write
       onFileChanged: reload()
       onLoaded: {
         const t = text();
@@ -30,8 +31,11 @@ QtObject {
     const path = dir + "/item-" + Date.now() + "-" + (++counter) + "." + (ext || "txt");
     const w = _watcher.createObject(root, { path: path, last: text, saveCb: onSave, blockLoading: true });
     w.setText(text);
+    // Default: terminal editors ($VISUAL/$EDITOR) need a terminal; xdg-open would start them headless.
+    const fallback = 't=$(command -v ghostty || command -v alacritty || command -v kitty || command -v foot); e=${VISUAL:-$EDITOR}; '
+      + 'if [ -n "$t" ] && [ -n "$e" ]; then exec "$t" -e $e "$1"; else exec xdg-open "$1"; fi';
     // short delay so FileView has flushed the file before the editor reads it
-    const cmd = ["sh", "-c", "sleep 0.2; " + (command.trim() || "xdg-open") + " \"$1\"", "sh", path];
+    const cmd = ["sh", "-c", "sleep 0.2; " + (command.trim() ? command + ' "$1"' : fallback), "sh", path];
     launch.createObject(root, { command: cmd }).running = true;
   }
 
