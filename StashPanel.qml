@@ -51,7 +51,7 @@ Rectangle {
   }
 
   readonly property var helpKeys: [
-    ["Enter / Shift+Enter", "Paste / paste as plain text"], ["Ctrl+Enter", "Copy without pasting"],
+    ["Enter / Shift+Enter", "Paste / paste as plain text"], ["Ctrl+Enter / Ctrl+Shift+C", "Copy without pasting"],
     ["Alt+1–9", "Paste item 1–9"], ["↑ ↓ PgUp PgDn Home End", "Move"],
     ["Tab / Shift+Tab", "Next / previous tab"], ["F2 / Ctrl+E", "Edit (Ctrl+S save, Esc cancel)"],
     ["Ctrl+O", "Open in external editor"], ["Ctrl+N", "New item"], ["Del / Ctrl+Z", "Delete / undo"],
@@ -951,6 +951,9 @@ Rectangle {
       if (!ctrl) return;
       cycleTab(event.key === Qt.Key_Left ? -1 : 1);
       break;
+    case Qt.Key_C:
+      if (!ctrl || !shift) return;
+      // fall through: Ctrl+Shift+C copies like Ctrl+Enter
     case Qt.Key_Return:
     case Qt.Key_Enter:
       if (!e) break;
