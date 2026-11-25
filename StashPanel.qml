@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Common
 import "Commands.js" as Commands
+import "icons.js" as Icons
 
 Rectangle {
   id: panel
@@ -20,6 +21,46 @@ Rectangle {
   readonly property var menuItems: !menuEntry ? [] : commands.filter(c => Commands.appliesTo(c, menuEntry.kind)
       && (!menuFilter || c.name.toLowerCase().includes(menuFilter.toLowerCase())))
   onMenuItemsChanged: menuIndex = Math.min(menuIndex, Math.max(0, menuItems.length - 1))
+
+  // Overlays: "" | "help" | "icons"
+  property string overlay: ""
+  property int iconIndex: 0
+  readonly property var tabIcons: ["folder", "note-sticky", "code", "terminal", "key", "lock", "star", "heart", "bookmark", "briefcase", "house", "user", "globe", "bolt", "flask", "music", "book", "cart-shopping", "server", "database", "shield", "key-skeleton", "wallet", "graduation-cap", "gamepad", "camera", "calendar", "lightbulb", "rocket", "bug", "cloud", "leaf", "paw", "mug-hot", "chart-line", "list-check", "link", "image", "palette", "envelope", "file-lines", "face-smile"]
+  readonly property int iconCols: 8
+
+  function openIconPicker() {
+    if (!tab.collection)
+      return notify("Only Notes, Snippets and your own tabs have custom icons");
+    iconIndex = Math.max(0, tabIcons.indexOf(tab.icon));
+    overlay = "icons";
+  }
+
+  function overlayKey(event) {
+    if (overlay === "icons") {
+      const n = tabIcons.length;
+      if (event.key === Qt.Key_Left) iconIndex = (iconIndex + n - 1) % n;
+      else if (event.key === Qt.Key_Right) iconIndex = (iconIndex + 1) % n;
+      else if (event.key === Qt.Key_Up) iconIndex = Math.max(0, iconIndex - iconCols);
+      else if (event.key === Qt.Key_Down) iconIndex = Math.min(n - 1, iconIndex + iconCols);
+      else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { store.setTabIcon(tab.collection, tabIcons[iconIndex]); overlay = ""; }
+      else if (event.key === Qt.Key_Escape) overlay = "";
+    } else {
+      overlay = "";  // help: any key closes
+    }
+    event.accepted = true;
+  }
+
+  readonly property var helpKeys: [
+    ["Enter / Shift+Enter", "Paste / paste as plain text"], ["Ctrl+Enter", "Copy without pasting"],
+    ["Alt+1–9", "Paste item 1–9"], ["↑ ↓ PgUp PgDn Home End", "Move"],
+    ["Tab / Shift+Tab", "Next / previous tab"], ["F2 / Ctrl+E", "Edit (Ctrl+S save, Esc cancel)"],
+    ["Ctrl+O", "Open in external editor"], ["Ctrl+N", "New item"], ["Del / Ctrl+Z", "Delete / undo"],
+    ["Ctrl+P", "Pin clipboard entry"], ["Ctrl+K", "Run a custom command"],
+    ["Ctrl+Shift+1–9 / 0", "Put item on slot / clear"], ["Ctrl+T / Ctrl+R", "New tab / rename tab"],
+    ["Ctrl+I", "Tab icon"], ["Ctrl+Shift+Del ×2", "Delete tab"],
+    ["Ctrl+Shift+L", "Encrypt tab (×2 on encrypted: decrypt)"], ["Ctrl+L", "Lock encrypted tabs"],
+    ["Ctrl+Shift+P", "Change master passphrase"], ["Esc", "Clear search / close"]
+  ]
 
   function openMenu() {
     const e = selectedEntry;
@@ -72,7 +113,7 @@ Rectangle {
   property int confirmTabDelete: 0  // collection id awaiting a second Ctrl+Shift+Del
 
   // Vault prompt: unlock a locked tab, or set the master passphrase / unlock before encrypting a tab.
-  property string vaultPrompt: ""   // "" | "setup" | "unlock"
+  property string vaultPrompt: ""   // "" | "setup" | "unlock" | "change"
   property int pendingEncrypt: 0
   property int confirmDecrypt: 0
   property bool authBusy: false
@@ -83,15 +124,25 @@ Rectangle {
     authError = "";
     pass1.input.text = "";
     pass2.input.text = "";
+    pass3.input.text = "";
     pass1.input.forceActiveFocus();
+  }
+
+  function startChangePassphrase() {
+    if (!store.hasMaster)
+      return notify("No master passphrase yet · Ctrl+Shift+L on a tab sets one");
+    vaultPrompt = "change";
   }
 
   // Tab moves between the setup fields; other routed keys (Ctrl+Tab, Tab in unlock, Ctrl+L…) act as usual.
   function authKey(event) {
-    if (event.key === Qt.Key_Tab && !(event.modifiers & Qt.ControlModifier) && authMode === "setup")
-      (pass1.input.activeFocus ? pass2.input : pass1.input).forceActiveFocus();
-    else
+    if (event.key === Qt.Key_Tab && !(event.modifiers & Qt.ControlModifier) && (authMode === "setup" || authMode === "change")) {
+      const fields = authMode === "change" ? [pass1, pass2, pass3] : [pass1, pass2];
+      const i = fields.findIndex(f => f.input.activeFocus);
+      fields[(i + 1) % fields.length].input.forceActiveFocus();
+    } else {
       handleKey(event);
+    }
   }
 
   function cancelAuth() {
@@ -120,6 +171,12 @@ Rectangle {
       if (p !== pass2.input.text) return authError = "Passphrases don't match";
       authBusy = true;
       store.setMaster(p, done);
+    } else if (authMode === "change") {
+      const np = pass2.input.text;
+      if (np.length < 8) return authError = "Use at least 8 characters for the new passphrase";
+      if (np !== pass3.input.text) return authError = "New passphrases don't match";
+      authBusy = true;
+      store.changeMaster(p, np, err => { done(err); if (!err) notify("Master passphrase changed"); });
     } else {
       authBusy = true;
       store.unlock(p, done);
@@ -129,6 +186,7 @@ Rectangle {
   function afterAuth() {
     pass1.input.text = "";
     pass2.input.text = "";
+    pass3.input.text = "";
     authError = "";
     vaultPrompt = "";
     if (pendingEncrypt) {
@@ -188,6 +246,7 @@ Rectangle {
 
   function reset() {
     menuOpen = false;
+    overlay = "";
     vaultPrompt = "";
     pendingEncrypt = 0;
     cancelEdit();
@@ -503,7 +562,7 @@ Rectangle {
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
           wrapMode: Text.Wrap
-          text: panel.authMode === "setup" ? "Set a master passphrase" : panel.tab.locked ? panel.tab.label + " is locked" : "Unlock to encrypt " + panel.tab.label
+          text: panel.authMode === "setup" ? "Set a master passphrase" : panel.authMode === "change" ? "Change master passphrase" : panel.tab.locked ? panel.tab.label + " is locked" : "Unlock to encrypt " + panel.tab.label
           color: Theme.surfaceText
           font.family: Theme.fontFamily
           font.pixelSize: 14
@@ -513,22 +572,31 @@ Rectangle {
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
           wrapMode: Text.Wrap
-          text: panel.authMode === "setup" ? "One passphrase unlocks every encrypted tab. It can't be recovered if you forget it." : "Enter your master passphrase"
+          text: panel.authMode === "setup" ? "One passphrase unlocks every encrypted tab. It can't be recovered if you forget it."
+              : panel.authMode === "change" ? "Every encrypted tab is re-encrypted with the new passphrase." : "Enter your master passphrase"
           color: Theme.surfaceVariantText
           font.family: Theme.fontFamily
           font.pixelSize: 12
         }
         PassField {
           id: pass1
-          placeholder: "Passphrase"
+          placeholder: panel.authMode === "change" ? "Current passphrase" : "Passphrase"
           onSubmitted: panel.submitAuth()
           onCancelled: panel.cancelAuth()
           onKeyRouted: event => panel.authKey(event)
         }
         PassField {
           id: pass2
-          visible: panel.authMode === "setup"
-          placeholder: "Repeat passphrase"
+          visible: panel.authMode === "setup" || panel.authMode === "change"
+          placeholder: panel.authMode === "change" ? "New passphrase" : "Repeat passphrase"
+          onSubmitted: panel.submitAuth()
+          onCancelled: panel.cancelAuth()
+          onKeyRouted: event => panel.authKey(event)
+        }
+        PassField {
+          id: pass3
+          visible: panel.authMode === "change"
+          placeholder: "Repeat new passphrase"
           onSubmitted: panel.submitAuth()
           onCancelled: panel.cancelAuth()
           onKeyRouted: event => panel.authKey(event)
@@ -537,7 +605,7 @@ Rectangle {
           width: parent.width
           horizontalAlignment: Text.AlignHCenter
           wrapMode: Text.Wrap
-          text: panel.authBusy ? "Working…" : panel.authError || ("⏎ " + (panel.authMode === "setup" ? "set passphrase" : "unlock") + " · Esc " + (panel.vaultPrompt ? "cancel" : "close"))
+          text: panel.authBusy ? "Working…" : panel.authError || ("⏎ " + (panel.authMode === "setup" ? "set passphrase" : panel.authMode === "change" ? "change" : "unlock") + " · Esc " + (panel.vaultPrompt ? "cancel" : "close"))
           color: panel.authError && !panel.authBusy ? Theme.error : Theme.surfaceVariantText
           font.family: Theme.fontFamily
           font.pixelSize: 11
@@ -701,6 +769,94 @@ Rectangle {
       }
     }
 
+    // Help / icon picker
+    Rectangle {
+      visible: panel.overlay !== ""
+      z: 6
+      anchors { left: parent.left; right: parent.right; bottom: footer.top; margins: 12 }
+      height: Math.min(footer.y - header.height - 24, ovCol.implicitHeight + 20)
+      radius: 12
+      color: Theme.surfaceContainerHigh
+      border.width: 1
+      border.color: Theme.outlineVariant
+      clip: true
+      Flickable {
+        id: ovFlick
+        anchors.fill: parent
+        anchors.margins: 10
+        contentHeight: ovCol.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
+      Column {
+        id: ovCol
+        x: 2
+        width: ovFlick.width - 4
+        spacing: 6
+        Text {
+          text: panel.overlay === "icons" ? "Icon for " + panel.tab.label + " · arrows, Enter" : "Shortcuts · any key closes"
+          color: Theme.surfaceVariantText
+          font.family: Theme.fontFamily
+          font.pixelSize: 11
+        }
+        Grid {
+          visible: panel.overlay === "icons"
+          columns: panel.iconCols
+          spacing: 4
+          Repeater {
+            model: panel.overlay === "icons" ? panel.tabIcons : []
+            delegate: Rectangle {
+              required property string modelData
+              required property int index
+              width: 36
+              height: 36
+              radius: 10
+              color: index === panel.iconIndex ? Theme.withAlpha(Theme.primary, 0.16) : "transparent"
+              border.width: index === panel.iconIndex ? 1 : 0
+              border.color: Theme.primary
+              Icon { anchors.centerIn: parent; name: parent.modelData; size: 15; color: parent.index === panel.iconIndex ? Theme.primary : Theme.surfaceText }
+              MouseArea {
+                anchors.fill: parent
+                onClicked: { store.setTabIcon(panel.tab.collection, parent.modelData); panel.overlay = ""; }
+              }
+            }
+          }
+        }
+        Grid {
+          id: helpGrid
+          visible: panel.overlay === "help"
+          columns: ovCol.width > 760 ? 2 : 1
+          columnSpacing: 20
+          rowSpacing: 6
+          readonly property real cellWidth: (ovCol.width - columnSpacing * (columns - 1)) / columns
+        Repeater {
+          model: panel.overlay === "help" ? panel.helpKeys : []
+          delegate: Row {
+            required property var modelData
+            width: helpGrid.cellWidth
+            spacing: 12
+            Text {
+              width: 150
+              text: modelData[0]
+              color: Theme.primary
+              font.family: Theme.monoFontFamily
+              font.pixelSize: 11
+              elide: Text.ElideRight
+            }
+            Text {
+              width: helpGrid.cellWidth - 162
+              text: modelData[1]
+              color: Theme.surfaceText
+              font.family: Theme.fontFamily
+              font.pixelSize: 12
+              elide: Text.ElideRight
+            }
+          }
+        }
+        }
+      }
+      }
+    }
+
     // Footer
     Rectangle {
       id: footer
@@ -724,8 +880,8 @@ Rectangle {
       Text {
         visible: !panel.confirmTabDelete && !panel.notice
         anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
-        text: panel.tab.encrypted ? (panel.tab.locked ? "Ctrl+Tab other tabs" : "⏎ paste · F2 edit · ^N new · ^L lock")
-            : panel.tab.collection ? "⏎ paste · F2 edit · ^N new · ^K run" : "⏎ paste · F2 edit · ^K run · ^P pin"
+        text: panel.tab.encrypted ? (panel.tab.locked ? "Tab other tabs · F1 keys" : "⏎ paste · F2 edit · ^L lock · F1 keys")
+            : panel.tab.collection ? "⏎ paste · F2 edit · ^N new · F1 keys" : "⏎ paste · F2 edit · ^K run · F1 keys"
         color: Theme.surfaceVariantText
         font.family: Theme.fontFamily
         font.pixelSize: 11
@@ -768,6 +924,8 @@ Rectangle {
   function handleKey(event) {
     if (menuOpen)
       return menuKey(event);
+    if (overlay)
+      return overlayKey(event);
     const ctrl = event.modifiers & Qt.ControlModifier;
     const shift = event.modifiers & Qt.ShiftModifier;
     const alt = event.modifiers & Qt.AltModifier;
@@ -818,6 +976,15 @@ Rectangle {
       if (!ctrl) return;
       openMenu();
       break;
+    case Qt.Key_F1: overlay = "help"; break;
+    case Qt.Key_Slash:
+      if (!ctrl) return;
+      overlay = "help";
+      break;
+    case Qt.Key_I:
+      if (!ctrl) return;
+      openIconPicker();
+      break;
     case Qt.Key_L:
       if (!ctrl) return;
       if (shift) toggleEncryption();
@@ -841,8 +1008,9 @@ Rectangle {
       if (tab.collection) store.undoDelete(); else history.undoDelete();
       break;
     case Qt.Key_P:
-      if (!ctrl || !e || e.collection) return;
-      history.setPinned(e, !e.pinned);
+      if (!ctrl) return;
+      if (shift) startChangePassphrase();
+      else if (e && !e.collection) history.setPinned(e, !e.pinned);
       break;
     default: {
       const d = digitOf(event);

@@ -10,6 +10,8 @@ QtObject {
   id: root
 
   property var db: null
+  property string dbName: "stash"
+  property bool importLegacy: true
   property var tabs: []        // [{id, name, icon, pos}]
   property var items: ({})     // tabId → [row], newest first (row shape matches history entries)
   property int version: 0      // bumped on every change so filters re-run
@@ -31,7 +33,7 @@ QtObject {
   property Runner _gpg: Runner {}
 
   function _open() {
-    db = LocalStorage.openDatabaseSync("stash", "", "Stash collections", 64 * 1024 * 1024);
+    db = LocalStorage.openDatabaseSync(dbName, "", "Stash collections", 64 * 1024 * 1024);
     db.transaction(tx => {
       tx.executeSql("PRAGMA secure_delete = ON");  // deleted plaintext is overwritten, not left in free pages
       tx.executeSql("CREATE TABLE IF NOT EXISTS vault (tab_id INTEGER PRIMARY KEY, blob TEXT NOT NULL)");
@@ -147,6 +149,37 @@ QtObject {
     });
     _load();
     return id;
+  }
+
+  function setTabIcon(id, icon) {
+    db.transaction(tx => tx.executeSql("UPDATE tabs SET icon = ? WHERE id = ?", [icon, id]));
+    _load();
+  }
+
+  // Re-encrypts every tab and the check value with the new passphrase, then stores all in one transaction.
+  function changeMaster(oldPass, newPass, cb) {
+    if (Object.keys(_saving).some(k => _saving[k]))
+      return cb("Still saving, try again in a moment");
+    unlock(oldPass, err => {
+      if (err) return cb(err);
+      const ids = Object.keys(vault), out = {};
+      let left = ids.length + 1, failed = "";
+      const step = (key, e, armored) => {
+        if (e) failed = e; else out[key] = armored;
+        if (--left > 0) return;
+        if (failed) return cb(failed);
+        db.transaction(tx => {
+          for (const id of ids)
+            tx.executeSql("INSERT OR REPLACE INTO vault (tab_id, blob) VALUES (?, ?)", [parseInt(id), out[id]]);
+          tx.executeSql("INSERT OR REPLACE INTO meta (key, value) VALUES ('vault_check', ?)", [out.check]);
+        });
+        passphrase = newPass;
+        cb("");
+      };
+      _encrypt(newPass, _check, (e, a) => step("check", e, a));
+      for (const id of ids)
+        _encrypt(newPass, JSON.stringify(vault[id]), (e, a) => step(id, e, a));
+    });
   }
 
   function renameTab(id, name) {
@@ -416,7 +449,7 @@ QtObject {
   Component.onCompleted: {
     _open();
     hasMaster = meta("vault_check") !== null;
-    if (meta("imported_clipboardplus") === null)
+    if (importLegacy && meta("imported_clipboardplus") === null)
       _import.running = true;
   }
 }

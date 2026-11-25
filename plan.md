@@ -37,7 +37,7 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 - [x] 3. Slots + IPC + niri-binds button
 - [x] 4. Custom commands
 - [x] 5. Encrypted tabs
-- [ ] 6. Settings page + polish
+- [~] 6. Settings page + polish
 
 ## Open items
 
@@ -65,3 +65,6 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
   encrypts / (twice) decrypts a tab, Ctrl+L locks; auto-lock setting (default 10 idle min) + session lock.
   Secrets: masked in list when titled, removed from DMS history after copy/paste, no slots,
   external-editor files deleted on lock, vim/nvim run with -n -i NONE.
+- Phase 6: Ctrl+Shift+P change master passphrase (all blocks re-encrypted, one transaction), Ctrl+I tab
+  icon picker, F1 / Ctrl+/ shortcut help, light code highlighting (Highlight.js). Store takes `dbName`
+  so tests can use a separate database.

@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Common
 import "Classify.js" as C
+import "Highlight.js" as H
 
 Item {
   id: row
@@ -138,8 +139,10 @@ Item {
         visible: row.kind !== "image" && !row.editing
         width: parent.width
         // titled encrypted items show the title only; the secret stays masked in the list
-        text: row.e.secret && row.e.title ? "••••••••" : row.kind === "color" ? row.body.trim() + "  <font color='" + Theme.surfaceVariantText + "'>" + C.rgbLabel(row.swatch) + "</font>" : row.body
-        textFormat: row.kind === "color" ? Text.StyledText : Text.PlainText
+        text: row.e.secret && row.e.title ? "••••••••"
+            : row.kind === "code" ? H.html(row.body.slice(0, 600), { keyword: Theme.primary, string: Theme.success, number: Theme.warning, comment: Theme.surfaceVariantText })
+            : row.kind === "color" ? row.body.trim() + "  <font color='" + Theme.surfaceVariantText + "'>" + C.rgbLabel(row.swatch) + "</font>" : row.body
+        textFormat: (row.kind === "color" || row.kind === "code") && !(row.e.secret && row.e.title) ? Text.StyledText : Text.PlainText
         color: Theme.surfaceText
         font.family: row.kind === "code" || row.kind === "path" ? Theme.monoFontFamily : Theme.fontFamily
         font.pixelSize: 13
