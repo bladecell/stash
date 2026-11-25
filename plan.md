@@ -37,7 +37,7 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 - [x] 3. Slots + IPC + niri-binds button
 - [x] 4. Custom commands
 - [x] 5. Encrypted tabs
-- [~] 6. Settings page + polish
+- [x] 6. Settings page + polish
 
 ## Open items
 
