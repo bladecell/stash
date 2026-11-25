@@ -4,6 +4,7 @@ import Quickshell.Io
 import qs.Common
 import qs.Services
 import qs.Widgets
+import "Commands.js" as Commands
 
 Item {
   id: root
@@ -13,6 +14,7 @@ Item {
   property bool open: false
   property bool terminalTarget: false
   property bool closeOnFocusLoss: setting("closeOnFocusLoss", false)
+  property var commands: setting("commands", Commands.defaults)
   property bool hadFocus: false  // showing the window emits a spurious inactive change; ignore until focused once
 
   function setting(key, fallback) {
@@ -25,6 +27,7 @@ Item {
     function onPluginDataChanged(id) {
       if (id !== "stash") return;
       root.closeOnFocusLoss = root.setting("closeOnFocusLoss", false);
+      root.commands = root.setting("commands", Commands.defaults);
       externalEditor.command = root.setting("editorCommand", "");
     }
   }
@@ -121,6 +124,51 @@ Item {
     });
   }
 
+  // ---- custom commands ----
+  Runner {
+    id: runner
+    onFinished: (job, out, err, code) => root.commandDone(job, out, err, code)
+  }
+
+  function runCommand(e, cmd) {
+    const out = cmd.output || "copy";
+    if (out === "paste" || out === "none")
+      hide();
+    else
+      panel.notify("Running " + cmd.name + "…");
+    const go = text => runner.run({ cmd: cmd, entry: e, terminal: terminalTarget }, text, e.kind);
+    if (e.collection || e.size <= 100)
+      go(e.preview || "");
+    else
+      history.loadFull(e, go);
+  }
+
+  function commandDone(job, out, err, code) {
+    const name = job.cmd.name;
+    if (code !== 0) {
+      const msg = code === 124 ? "timed out after 20 s" : (err || out).trim().split("\n").slice(-3).join("\n") || "exit " + code;
+      ToastService.showError("Stash: " + name + " failed", msg);
+      panel.notify(name + " failed");
+      return;
+    }
+    out = out.replace(/\n$/, "");
+    switch (job.cmd.output || "copy") {
+    case "copy":
+      history.copyText(out, () => panel.notify(name + ": output copied"));
+      break;
+    case "paste":
+      history.pasteText(out, job.terminal, null);
+      break;
+    case "replace":
+      if (job.entry.collection)
+        store.updateItem(job.entry.dbId, { content: out });
+      else
+        history.edit(job.entry, out);
+      panel.notify(name + ": item updated");
+      break;
+    }
+  }
+
   function paste(entry, textOnly) {
     if (entry.collection)
       history.pasteText(entry.preview, terminalTarget, () => hide());
@@ -196,6 +244,8 @@ Item {
       anchors.fill: parent
       history: history
       store: store
+      commands: root.commands
+      onCommandRequested: (entry, cmd) => root.runCommand(entry, cmd)
       onExternalRequested: (text, ext, onSave) => externalEditor.open(text, ext, onSave)
       onCloseRequested: root.hide()
       onPasteRequested: (entry, textOnly) => root.paste(entry, textOnly)

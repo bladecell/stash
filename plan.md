@@ -35,7 +35,7 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 - [x] 1. Window, tabs, search, keyboard nav, paste on Enter, delete, history from DMS
 - [x] 2. SQLite: new items, inline edit, external editor, notes/snippets/custom tabs, migration
 - [x] 3. Slots + IPC + niri-binds button
-- [ ] 4. Custom commands
+- [~] 4. Custom commands
 - [ ] 5. Encrypted tabs
 - [ ] 6. Settings page + polish
 
@@ -58,3 +58,5 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 - Digit keys fall back to the physical number row (XKB keycodes 10–19) for layouts like cz.
 - Cycle copy (IPC `cycle`, default bind Mod+C; open is Mod+V): each press copies the next older entry from a snapshot; resets 5 s after the last press.
 - `niri-binds.sh [slot-mod] [cycle-key|none] [dir]`: writes `stash-binds.kdl`, adds the include, skips taken keys, rolls back on validate failure.
+- Custom commands: plugin setting `commands` [{name, command, output, kinds}] (defaults in Commands.js),
+  edited in the settings list. Ctrl+K menu; text on stdin + $STASH_TEXT/$STASH_KIND; `timeout 20 sh -c`.

@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Common
+import "Commands.js" as Commands
 
 Rectangle {
   id: panel
@@ -8,6 +9,47 @@ Rectangle {
   signal closeRequested
   signal pasteRequested(var entry, bool textOnly)
   signal externalRequested(string text, string ext, var onSave)
+  signal commandRequested(var entry, var cmd)
+  property var commands: []
+
+  // Command menu (Ctrl+K): typing filters, Enter or 1–9 runs, Esc closes.
+  property bool menuOpen: false
+  property int menuIndex: 0
+  property string menuFilter: ""
+  property var menuEntry: null
+  readonly property var menuItems: !menuEntry ? [] : commands.filter(c => Commands.appliesTo(c, menuEntry.kind)
+      && (!menuFilter || c.name.toLowerCase().includes(menuFilter.toLowerCase())))
+  onMenuItemsChanged: menuIndex = Math.min(menuIndex, Math.max(0, menuItems.length - 1))
+
+  function openMenu() {
+    const e = selectedEntry;
+    if (!e || e.draft || e.kind === "image")
+      return;
+    menuEntry = e;
+    menuFilter = "";
+    menuIndex = 0;
+    menuOpen = true;
+  }
+
+  function runMenu(i) {
+    const cmd = menuItems[i];
+    const e = menuEntry;
+    menuOpen = false;
+    if (cmd)
+      commandRequested(e, cmd);
+  }
+
+  function menuKey(event) {
+    const d = digitOf(event);
+    if (event.key === Qt.Key_Escape) menuOpen = false;
+    else if (event.key === Qt.Key_Down) menuIndex = Math.min(menuItems.length - 1, menuIndex + 1);
+    else if (event.key === Qt.Key_Up) menuIndex = Math.max(0, menuIndex - 1);
+    else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) runMenu(menuIndex);
+    else if (event.key === Qt.Key_Backspace) menuFilter = menuFilter.slice(0, -1);
+    else if (d >= 1 && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier))) runMenu(d - 1);
+    else if (event.text && event.text.charCodeAt(0) >= 32 && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier))) menuFilter += event.text;
+    event.accepted = true;
+  }
 
   readonly property var builtinTabs: [
     { id: "all", label: "Clipboard", icon: "clipboard" },
@@ -44,6 +86,7 @@ Rectangle {
   }
 
   function reset() {
+    menuOpen = false;
     cancelEdit();
     naming = "";
     search.text = "";
@@ -403,6 +446,93 @@ Rectangle {
       }
     }
 
+    // Command menu
+    Rectangle {
+      visible: panel.menuOpen
+      z: 5
+      anchors { left: parent.left; right: parent.right; bottom: footer.top; margins: 12 }
+      height: menuCol.implicitHeight + 16
+      radius: 12
+      color: Theme.surfaceContainerHigh
+      border.width: 1
+      border.color: Theme.outlineVariant
+      Column {
+        id: menuCol
+        x: 8
+        y: 8
+        width: parent.width - 16
+        spacing: 2
+        Row {
+          x: 6
+          spacing: 8
+          height: 24
+          Icon { anchors.verticalCenter: parent.verticalCenter; name: "terminal"; size: 12; color: Theme.primary }
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: panel.menuFilter ? panel.menuFilter : "Run on selected item · type to filter"
+            color: panel.menuFilter ? Theme.surfaceText : Theme.surfaceVariantText
+            font.family: Theme.fontFamily
+            font.pixelSize: 12
+          }
+        }
+        Repeater {
+          model: panel.menuItems
+          delegate: Rectangle {
+            id: menuRow
+            required property var modelData
+            required property int index
+            width: menuCol.width
+            height: 30
+            radius: 8
+            color: index === panel.menuIndex ? Theme.withAlpha(Theme.primary, 0.14) : "transparent"
+            Text {
+              x: 8
+              width: 16
+              anchors.verticalCenter: parent.verticalCenter
+              text: menuRow.index < 9 ? String(menuRow.index + 1) : ""
+              color: Theme.surfaceVariantText
+              font.family: Theme.fontFamily
+              font.pixelSize: 11
+            }
+            Text {
+              x: 30
+              width: parent.width - 30 - outText.width - 16
+              anchors.verticalCenter: parent.verticalCenter
+              text: menuRow.modelData.name
+              color: Theme.surfaceText
+              font.family: Theme.fontFamily
+              font.pixelSize: 13
+              elide: Text.ElideRight
+            }
+            Text {
+              id: outText
+              anchors { right: parent.right; rightMargin: 8; verticalCenter: parent.verticalCenter }
+              text: menuRow.modelData.output || "copy"
+              color: Theme.surfaceVariantText
+              font.family: Theme.fontFamily
+              font.pixelSize: 11
+            }
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              onEntered: panel.menuIndex = menuRow.index
+              onClicked: panel.runMenu(menuRow.index)
+            }
+          }
+        }
+        Text {
+          visible: panel.menuItems.length === 0
+          x: 8
+          height: 28
+          verticalAlignment: Text.AlignVCenter
+          text: "No commands for this item · add them in Stash settings"
+          color: Theme.surfaceVariantText
+          font.family: Theme.fontFamily
+          font.pixelSize: 12
+        }
+      }
+    }
+
     // Footer
     Rectangle {
       id: footer
@@ -426,7 +556,7 @@ Rectangle {
       Text {
         visible: !panel.confirmTabDelete && !panel.notice
         anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
-        text: panel.tab.collection ? "⏎ paste · F2 edit · ^N new · Del delete" : "⏎ paste · F2 edit · Del delete · ^P pin"
+        text: panel.tab.collection ? "⏎ paste · F2 edit · ^N new · ^K run" : "⏎ paste · F2 edit · ^K run · ^P pin"
         color: Theme.surfaceVariantText
         font.family: Theme.fontFamily
         font.pixelSize: 11
@@ -466,6 +596,8 @@ Rectangle {
   }
 
   function handleKey(event) {
+    if (menuOpen)
+      return menuKey(event);
     const ctrl = event.modifiers & Qt.ControlModifier;
     const shift = event.modifiers & Qt.ShiftModifier;
     const alt = event.modifiers & Qt.AltModifier;
@@ -511,6 +643,10 @@ Rectangle {
     case Qt.Key_O:
       if (!ctrl) return;
       openSelectedExternal();
+      break;
+    case Qt.Key_K:
+      if (!ctrl) return;
+      openMenu();
       break;
     case Qt.Key_T:
       if (!ctrl) return;

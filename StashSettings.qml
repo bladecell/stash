@@ -3,6 +3,7 @@ import Quickshell.Io
 import qs.Common
 import qs.DCommon.Widgets
 import qs.Modules.Plugins
+import "Commands.js" as Commands
 
 PluginSettings {
   id: root
@@ -21,6 +22,19 @@ PluginSettings {
     description: "Used by Ctrl+O; the file path is appended. Empty runs $VISUAL or $EDITOR in your terminal"
     placeholder: "e.g. zeditor"
     defaultValue: ""
+  }
+
+  ListSettingWithInput {
+    settingKey: "commands"
+    label: "Custom commands"
+    description: "Ctrl+K in Stash runs these on the selected item. The text arrives on stdin and in $STASH_TEXT. Output: copy, paste, replace (rewrite the item) or none. Kinds limits the command to item types (text, url, code, email, path, color, note); empty means all"
+    defaultValue: Commands.defaults
+    fields: [
+      { id: "name", label: "Name", placeholder: "Format JSON", width: 130, required: true },
+      { id: "command", label: "Command", placeholder: "jq .", width: 230, required: true },
+      { id: "output", label: "Output", placeholder: "copy", width: 80, default: "copy" },
+      { id: "kinds", label: "Kinds", placeholder: "all", width: 110 }
+    ]
   }
 
   StringSetting {
