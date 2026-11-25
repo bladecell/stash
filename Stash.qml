@@ -5,6 +5,7 @@ import qs.Common
 import qs.Services
 import qs.Widgets
 import "Commands.js" as Commands
+import "Classify.js" as C
 
 Item {
   id: root
@@ -137,11 +138,67 @@ Item {
     cycleIndex = (cycleIndex + 1) % cycleList.length;  // wraps back to the original clipboard
     const e = cycleList[cycleIndex];
     const n = cycleIndex + 1;
+    history.quiet();
     DMSService.sendRequest("clipboard.copyEntry", { "id": e.id }, r => {
       if (r.error)
         ToastService.showError("Stash: " + r.error);
       else
         ToastService.showInfo("Clipboard #" + n + (e.isImage ? " (image)" : ": " + e.preview.slice(0, 60)));
+    });
+  }
+
+  // ---- commands that run on every copy ----
+  // The newest entry goes through each matching "On copy" command in order; a changed result replaces it.
+  property int autoLastId: 0
+  property bool autoBusy: false
+  property bool autoAgain: false
+  property string autoProduced: ""
+
+  Connections {
+    target: DMSService
+    function onClipboardStateUpdate(data) { root.autoRun(); }
+  }
+
+  function autoRun() {
+    const cmds = (commands || []).filter(Commands.isAuto);
+    if (!cmds.length) return;
+    if (autoBusy) { autoAgain = true; return; }
+    autoBusy = true;
+    const finish = () => {
+      autoBusy = false;
+      if (autoAgain) { autoAgain = false; autoRun(); }
+    };
+    DMSService.sendRequest("clipboard.search", { "limit": 1, "offset": 0 }, r => {
+      const e = ((r.result || {}).entries || [])[0];
+      if (!e || e.id <= root.autoLastId) return finish();
+      root.autoLastId = e.id;
+      if (e.isImage || Date.now() < history.quietUntil) return finish();
+      const kind = C.kind(e);
+      const todo = cmds.filter(c => Commands.appliesTo(c, kind));
+      if (!todo.length) return finish();
+      DMSService.sendRequest("clipboard.getEntry", { "id": e.id }, g => {
+        const orig = g.result && g.result.data !== undefined ? history.text(g.result) : null;
+        if (typeof orig !== "string" || orig === root.autoProduced) return finish();
+        let i = 0;
+        const step = text => {
+          if (i >= todo.length) {
+            if (text && text !== orig) {
+              root.autoProduced = text;
+              history.copyText(text, () => DMSService.sendRequest("clipboard.deleteEntry", { "id": e.id }, () => {}));
+            }
+            return finish();
+          }
+          const c = todo[i++];
+          runner.exec(["timeout", "10", "sh", "-c", c.command], text, (out, err, code) => {
+            if (code !== 0) {
+              ToastService.showError("Stash: " + c.name + " (on copy) failed", (err || out).trim().split("\n").slice(-3).join("\n"));
+              return step(text);
+            }
+            step(out.replace(/\n$/, ""));
+          }, { "STASH_TEXT": text, "STASH_KIND": kind, "STASH_DIR": runner.dir });
+        };
+        step(orig);
+      });
     });
   }
 
@@ -201,11 +258,21 @@ Item {
   Connections {
     target: DMSService
     function onIsConnectedChanged() {
-      if (DMSService.isConnected)
+      if (DMSService.isConnected) {
         history.refresh();
+        root.autoInit();
+      }
     }
   }
-  Component.onCompleted: if (DMSService.isConnected) history.refresh()
+  Component.onCompleted: if (DMSService.isConnected) { history.refresh(); autoInit(); }
+
+  // Start "On copy" after the current newest entry, so old history isn't rewritten.
+  function autoInit() {
+    DMSService.sendRequest("clipboard.search", { "limit": 1, "offset": 0 }, r => {
+      const e = ((r.result || {}).entries || [])[0];
+      if (e && e.id > root.autoLastId) root.autoLastId = e.id;
+    });
+  }
 
   IpcHandler {
     target: "stash"

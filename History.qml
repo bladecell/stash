@@ -14,6 +14,9 @@ QtObject {
   property bool active: false       // window open → keep in sync
   property bool dirty: true
   property var hidden: ({})         // id → true while a delete is pending undo
+  property real quietUntil: 0       // clipboard changes before this time came from Stash itself
+
+  function quiet() { quietUntil = Date.now() + 2000; }
 
   // caches: full text for long entries, data URLs for images
   property var textCache: ({})
@@ -84,12 +87,18 @@ QtObject {
     }
   }
 
+  // clipboard.getEntry returns the stored bytes base64-encoded; text entries are UTF-8.
+  function text(r) {
+    return Qt.atob(r.data);  // Qt decodes the bytes as UTF-8
+  }
+
   function fullText(e, cb) {
     if (textCache[e.id] !== undefined)
       return textCache[e.id];
     if (!queue.some(j => j.id === e.id))
       queue.push({ id: e.id, done: r => {
-        const t = r.data.length > 600 ? r.data.slice(0, 600) : r.data;
+        const full = root.text(r);
+        const t = full.length > 600 ? full.slice(0, 600) : full;
         root.textCache[e.id] = t;  // mutated in place: no rebinding of every filter
         cb && cb(t);
       } });
@@ -123,11 +132,13 @@ QtObject {
   }
 
   function copy(e, textOnly, done) {
+    quiet();
     DMSService.sendRequest("clipboard.copyEntry", { "id": e.id, "textOnly": !!textOnly }, _after(done));
   }
 
   // delay: ms before the paste keystroke (longer for global binds, so held modifiers are released)
   function paste(e, textOnly, terminal, beforePaste, delay) {
+    quiet();
     DMSService.sendRequest("clipboard.copyEntry", { "id": e.id, "textOnly": !!textOnly }, _after(() => {
       beforePaste && beforePaste();
       _schedulePaste(terminal, delay);
@@ -151,12 +162,13 @@ QtObject {
     DMSService.sendRequest("clipboard.getEntry", { "id": e.id }, response => {
       const r = response.result;
       if (r && r.data !== undefined)
-        cb(r.data);
+        cb(root.text(r));
     });
   }
 
   // Rewrites a history entry; DMS replaces it with a new newest entry (new id), passed to done.
   function edit(e, text, done) {
+    quiet();
     DMSService.sendRequest("clipboard.editEntry", { "id": e.id, "text": text }, _after(() => {
       delete root.textCache[e.id];
       refresh();
@@ -170,6 +182,7 @@ QtObject {
 
   // secret: drop the entry DMS records into history (the clipboard itself keeps the text).
   function copyText(text, done, secret) {
+    quiet();
     DMSService.sendRequest("clipboard.copy", { "text": text }, _after(() => {
       if (secret)
         _forget(text);

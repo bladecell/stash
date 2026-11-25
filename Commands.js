@@ -3,6 +3,7 @@
 // Default custom commands. The item text arrives on stdin and in $STASH_TEXT ($STASH_KIND = item kind,
 // $STASH_DIR = plugin folder).
 // output: copy | paste | replace (rewrite the item) | none. kinds: comma list (url,code,…), empty = all.
+// auto: "yes" runs the command on every new clipboard entry it applies to (copy/replace outputs only).
 var defaults = [
   { name: "Open", command: "xdg-open \"$STASH_TEXT\"", output: "none", kinds: "url,path" },
   { name: "Remove tracking", command: "python3 \"$STASH_DIR/clean-url.py\"", output: "copy", kinds: "url,text" },
@@ -15,6 +16,10 @@ var defaults = [
 ];
 
 var outputs = ["copy", "paste", "replace", "none"];
+
+function isAuto(cmd) {
+  return /^(yes|y|true|on|1)$/i.test((cmd.auto || "").trim()) && (cmd.output || "copy") !== "paste" && cmd.output !== "none";
+}
 
 function appliesTo(cmd, kind) {
   const k = (cmd.kinds || "").trim();
