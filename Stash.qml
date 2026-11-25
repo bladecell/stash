@@ -17,6 +17,7 @@ Item {
   property bool closeOnFocusLoss: setting("closeOnFocusLoss", false)
   property var commands: setting("commands", Commands.defaults)
   property int autoLockMinutes: setting("autoLockMinutes", 10)
+  property bool holdSlots: setting("holdSlots", true)
   property bool hadFocus: false  // showing the window emits a spurious inactive change; ignore until focused once
 
   function setting(key, fallback) {
@@ -31,6 +32,7 @@ Item {
       root.closeOnFocusLoss = root.setting("closeOnFocusLoss", false);
       root.commands = root.setting("commands", Commands.defaults);
       root.autoLockMinutes = root.setting("autoLockMinutes", 10);
+      root.holdSlots = root.setting("holdSlots", true);
       externalEditor.command = root.setting("editorCommand", "");
     }
   }
@@ -139,16 +141,63 @@ Item {
     const e = cycleList[cycleIndex];
     DMSService.sendRequest("clipboard.copyEntry", { "id": e.id }, r => {
       if (r.error)
-        ToastService.showError("Stash: " + r.error);
-      else
-        cycleOverlay.flash();
+        return ToastService.showError("Stash: " + r.error);
+      const list = root.cycleList, rows = [];
+      for (let k = 0; k < Math.min(3, list.length); k++) {
+        const i = (root.cycleIndex + k) % list.length;
+        rows.push({ n: i + 1, text: root.label(list[i]), current: k === 0 });
+      }
+      overlay.rows = rows;
+      overlay.flash();
     });
   }
 
+  function label(e) {
+    if (e.collection)
+      return e.title || (e.secret ? "••••••••" : (e.preview || "").replace(/\s+/g, " ").trim());
+    return e.isImage ? "Image · " + C.imageLabel(e.preview) : (e.preview || "").replace(/\s+/g, " ").trim();
+  }
+
   CycleOverlay {
-    id: cycleOverlay
-    entries: root.cycleList
-    index: root.cycleIndex
+    id: overlay
+  }
+
+  // Hold Mod+Alt alone for a moment → list what Mod+Alt+1–9 would paste. modwatch.py reads the
+  // keyboards (input group) and prints show/hide.
+  property bool slotsHeld: false
+  Process {
+    id: modWatch
+    command: ["python3", "-u", runner.dir + "/modwatch.py", "0.5"]
+    running: root.holdSlots
+    stdout: SplitParser {
+      onRead: line => line.trim() === "show" ? root.showSlots() : root.hideSlots()
+    }
+    onExited: if (root.holdSlots) modWatchRestart.start()
+  }
+  Timer {
+    id: modWatchRestart
+    interval: 5000
+    onTriggered: if (root.holdSlots) modWatch.running = true
+  }
+
+  function showSlots() {
+    slotsHeld = true;
+    DMSService.sendRequest("clipboard.search", { "limit": 9, "offset": 0 }, r => {
+      if (!root.slotsHeld) return;
+      const hist = (r.result || {}).entries || [], rows = [];
+      for (let n = 1; n <= 9; n++) {
+        const item = store.slotItem(n), e = item || hist[n - 1];
+        if (e) rows.push({ n: n, text: root.label(e), badge: item ? "slot" : "" });
+      }
+      overlay.rows = rows;
+      overlay.show();
+    });
+  }
+
+  function hideSlots() {
+    if (!slotsHeld) return;
+    slotsHeld = false;
+    overlay.hide();
   }
 
   // Ctrl+Shift+V: run the item through every "On paste" command for its kind (in list order), paste the result.

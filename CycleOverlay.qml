@@ -3,20 +3,20 @@ import Quickshell
 import Quickshell.Wayland
 import qs.Common
 import qs.DCommon.Widgets
-import "Classify.js" as C
 
-// Mod+C cycle preview: the entry now on the clipboard plus the next two, on an overlay layer
-// (no focus, no tiling, not resizable). Hides shortly after the last press.
+// Numbered list on an overlay layer (no focus, no tiling, not resizable, clicks pass through).
+// Used for the Mod+C cycle preview and the hold-Mod+Alt slot list.
 PanelWindow {
   id: win
-  property var entries: []   // cycle snapshot: [{id, preview, isImage}]
-  property int index: 0      // entry now on the clipboard
+  property var rows: []   // [{ n, text, current, badge }]
   property bool shown: false
 
-  function flash() {
+  function flash() {    // show, then hide shortly after the last call
     shown = true;
     hideTimer.restart();
   }
+  function show() { hideTimer.stop(); shown = true; }
+  function hide() { hideTimer.stop(); shown = false; }
 
   Timer {
     id: hideTimer
@@ -30,9 +30,9 @@ PanelWindow {
   implicitHeight: box.height
   exclusionMode: ExclusionMode.Ignore
   WlrLayershell.layer: WlrLayer.Overlay
-  WlrLayershell.namespace: "dms:stash-cycle"
+  WlrLayershell.namespace: "dms:stash-overlay"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-  mask: Region {}  // clicks pass through
+  mask: Region {}
 
   WindowBlur {
     targetWindow: win
@@ -58,39 +58,52 @@ PanelWindow {
       spacing: 2
 
       Repeater {
-        model: 3
+        model: win.rows
         delegate: Rectangle {
-          required property int index
-          readonly property int pos: win.entries.length ? (win.index + index) % win.entries.length : 0
-          readonly property var e: win.entries[pos] || null
-          readonly property bool current: index === 0
-          visible: !!e && (index === 0 || win.entries.length > index)
+          required property var modelData
           width: col.width
-          height: 38
+          height: 36
           radius: 10
-          color: current ? Theme.withAlpha(Theme.primary, 0.16) : "transparent"
+          color: modelData.current ? Theme.withAlpha(Theme.primary, 0.16) : "transparent"
 
           Text {
             x: 10
             width: 26
             anchors.verticalCenter: parent.verticalCenter
-            text: pos + 1
-            color: parent.current ? Theme.primary : Theme.surfaceVariantText
+            text: modelData.n
+            color: modelData.current ? Theme.primary : Theme.surfaceVariantText
             font.family: Theme.monoFontFamily
             font.pixelSize: 12
             font.weight: Font.DemiBold
           }
           Text {
             x: 40
-            width: parent.width - 50
+            width: parent.width - 50 - (badge.visible ? badge.width + 8 : 0)
             anchors.verticalCenter: parent.verticalCenter
-            text: !e ? "" : e.isImage ? "Image · " + C.imageLabel(e.preview) : (e.preview || "").replace(/\s+/g, " ").trim()
-            color: parent.current ? Theme.surfaceText : Theme.surfaceVariantText
+            text: modelData.text
+            color: modelData.current ? Theme.surfaceText : Theme.surfaceVariantText
             font.family: Theme.fontFamily
-            font.pixelSize: parent.current ? 14 : 13
-            font.weight: parent.current ? Font.Medium : Font.Normal
+            font.pixelSize: modelData.current ? 14 : 13
+            font.weight: modelData.current ? Font.Medium : Font.Normal
             elide: Text.ElideRight
             maximumLineCount: 1
+          }
+          Rectangle {
+            id: badge
+            visible: !!modelData.badge
+            anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
+            width: badgeText.implicitWidth + 14
+            height: 20
+            radius: 10
+            color: Theme.withAlpha(Theme.primary, 0.16)
+            Text {
+              id: badgeText
+              anchors.centerIn: parent
+              text: modelData.badge || ""
+              color: Theme.primary
+              font.family: Theme.fontFamily
+              font.pixelSize: 11
+            }
           }
         }
       }

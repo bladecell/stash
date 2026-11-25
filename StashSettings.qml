@@ -53,6 +53,13 @@ PluginSettings {
     defaultValue: "Mod+C"
   }
 
+  ToggleSetting {
+    settingKey: "holdSlots"
+    label: "Hold Mod+Alt to show paste slots"
+    description: "Holding Super+left Alt alone for half a second lists what Mod+Alt+1–9 would paste. Watches the keyboard (needs the input group) but only tracks whether those keys are down"
+    defaultValue: true
+  }
+
   StringSetting {
     id: cleanKey
     settingKey: "cleanPasteKey"
