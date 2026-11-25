@@ -137,7 +137,8 @@ Item {
       Text {
         visible: row.kind !== "image" && !row.editing
         width: parent.width
-        text: row.kind === "color" ? row.body.trim() + "  <font color='" + Theme.surfaceVariantText + "'>" + C.rgbLabel(row.swatch) + "</font>" : row.body
+        // titled encrypted items show the title only; the secret stays masked in the list
+        text: row.e.secret && row.e.title ? "••••••••" : row.kind === "color" ? row.body.trim() + "  <font color='" + Theme.surfaceVariantText + "'>" + C.rgbLabel(row.swatch) + "</font>" : row.body
         textFormat: row.kind === "color" ? Text.StyledText : Text.PlainText
         color: Theme.surfaceText
         font.family: row.kind === "code" || row.kind === "path" ? Theme.monoFontFamily : Theme.fontFamily

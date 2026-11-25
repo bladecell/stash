@@ -36,7 +36,7 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 - [x] 2. SQLite: new items, inline edit, external editor, notes/snippets/custom tabs, migration
 - [x] 3. Slots + IPC + niri-binds button
 - [x] 4. Custom commands
-- [ ] 5. Encrypted tabs
+- [~] 5. Encrypted tabs
 - [ ] 6. Settings page + polish
 
 ## Open items
@@ -60,3 +60,8 @@ Remote: `git@github-personal:bladecell/stash.git`. Push after each working phase
 - `niri-binds.sh [slot-mod] [cycle-key|none] [dir]`: writes `stash-binds.kdl`, adds the include, skips taken keys, rolls back on validate failure.
 - Custom commands: plugin setting `commands` [{name, command, output, kinds}] (defaults in Commands.js),
   edited in the settings list. Ctrl+K menu; text on stdin + $STASH_TEXT/$STASH_KIND; `timeout 20 sh -c`.
+- Encrypted tabs: one gpg (AES256, symmetric, --no-symkey-cache, passphrase on stdin) block per tab in
+  `vault`; master check in meta `vault_check`; vault ids negative; `PRAGMA secure_delete`. Ctrl+Shift+L
+  encrypts / (twice) decrypts a tab, Ctrl+L locks; auto-lock setting (default 10 idle min) + session lock.
+  Secrets: masked in list when titled, removed from DMS history after copy/paste, no slots,
+  external-editor files deleted on lock, vim/nvim run with -n -i NONE.

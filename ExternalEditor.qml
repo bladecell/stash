@@ -27,16 +27,30 @@ QtObject {
     }
   }
 
-  function open(text, ext, onSave) {
+  property var secrets: []  // watchers of decrypted items; dropped and their files removed on lock
+
+  function open(text, ext, onSave, secret) {
     const path = dir + "/item-" + Date.now() + "-" + (++counter) + "." + (ext || "txt");
     const w = _watcher.createObject(root, { path: path, last: text, saveCb: onSave, blockLoading: true });
+    if (secret)
+      secrets.push(w);
     w.setText(text);
     // Default: terminal editors ($VISUAL/$EDITOR) need a terminal; xdg-open would start them headless.
+    // Secrets: vim/nvim without swap or shada files, so no plaintext copy lands on disk.
     const fallback = 't=$(command -v ghostty || command -v alacritty || command -v kitty || command -v foot); e=${VISUAL:-$EDITOR}; '
+      + (secret ? 'case "${e##*/}" in vim|nvim) e="$e -n -i NONE";; esac; ' : '')
       + 'if [ -n "$t" ] && [ -n "$e" ]; then exec "$t" -e $e "$1"; else exec xdg-open "$1"; fi';
     // short delay so FileView has flushed the file before the editor reads it
     const cmd = ["sh", "-c", "sleep 0.2; " + (command.trim() ? command + ' "$1"' : fallback), "sh", path];
     launch.createObject(root, { command: cmd }).running = true;
+  }
+
+  function forgetSecrets() {
+    for (const w of secrets) {
+      Quickshell.execDetached(["rm", "-f", w.path]);
+      w.destroy();
+    }
+    secrets = [];
   }
 
   property Component launch: Component {

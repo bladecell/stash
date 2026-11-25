@@ -15,6 +15,7 @@ Item {
   property bool terminalTarget: false
   property bool closeOnFocusLoss: setting("closeOnFocusLoss", false)
   property var commands: setting("commands", Commands.defaults)
+  property int autoLockMinutes: setting("autoLockMinutes", 10)
   property bool hadFocus: false  // showing the window emits a spurious inactive change; ignore until focused once
 
   function setting(key, fallback) {
@@ -28,6 +29,7 @@ Item {
       if (id !== "stash") return;
       root.closeOnFocusLoss = root.setting("closeOnFocusLoss", false);
       root.commands = root.setting("commands", Commands.defaults);
+      root.autoLockMinutes = root.setting("autoLockMinutes", 10);
       externalEditor.command = root.setting("editorCommand", "");
     }
   }
@@ -39,6 +41,23 @@ Item {
 
   Store {
     id: store
+    onLocked: externalEditor.forgetSecrets()
+    onUnlockedChanged: if (unlocked) autoLock.restart()
+  }
+
+  // Lock the vault after N idle minutes (not while Stash is open) and whenever the session locks.
+  Timer {
+    id: autoLock
+    interval: Math.max(1, root.autoLockMinutes) * 60000
+    onTriggered: {
+      if (root.autoLockMinutes <= 0) return;
+      if (root.open) restart();
+      else store.lock();
+    }
+  }
+  Connections {
+    target: SessionService
+    function onSessionLocked() { store.lock(); }
   }
 
   ExternalEditor {
@@ -53,12 +72,14 @@ Item {
     open = true;
     hadFocus = false;
     win.visible = true;
+    if (store.unlocked) autoLock.restart();
     panel.reset();
   }
 
   function hide() {
     open = false;
     win.visible = false;
+    if (store.unlocked) autoLock.restart();
     history.commitDelete();
     store.lastDeleted = null;
   }
@@ -154,10 +175,10 @@ Item {
     out = out.replace(/\n$/, "");
     switch (job.cmd.output || "copy") {
     case "copy":
-      history.copyText(out, () => panel.notify(name + ": output copied"));
+      history.copyText(out, () => panel.notify(name + ": output copied"), job.entry.secret);
       break;
     case "paste":
-      history.pasteText(out, job.terminal, null);
+      history.pasteText(out, job.terminal, null, 0, job.entry.secret);
       break;
     case "replace":
       if (job.entry.collection)
@@ -171,7 +192,7 @@ Item {
 
   function paste(entry, textOnly) {
     if (entry.collection)
-      history.pasteText(entry.preview, terminalTarget, () => hide());
+      history.pasteText(entry.preview, terminalTarget, () => hide(), 0, entry.secret);
     else
       history.paste(entry, textOnly, terminalTarget, () => hide());
   }
@@ -200,6 +221,7 @@ Item {
       root.cycleCopy();
       return "ok";
     }
+    function lock(): string { store.lock(); return "locked"; }
     function slots(): string {
       const out = [];
       for (let n = 1; n <= 9; n++) {
@@ -246,7 +268,7 @@ Item {
       store: store
       commands: root.commands
       onCommandRequested: (entry, cmd) => root.runCommand(entry, cmd)
-      onExternalRequested: (text, ext, onSave) => externalEditor.open(text, ext, onSave)
+      onExternalRequested: (text, ext, onSave, secret) => externalEditor.open(text, ext, onSave, secret)
       onCloseRequested: root.hide()
       onPasteRequested: (entry, textOnly) => root.paste(entry, textOnly)
       // CopyQ-like: close when focus moves to another window

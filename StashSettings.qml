@@ -16,6 +16,15 @@ PluginSettings {
     defaultValue: false
   }
 
+  SliderSetting {
+    settingKey: "autoLockMinutes"
+    label: "Lock encrypted tabs after (minutes)"
+    description: "Idle time before encrypted tabs lock again; 0 locks only on Ctrl+L or when the screen locks"
+    defaultValue: 10
+    minimum: 0
+    maximum: 120
+  }
+
   StringSetting {
     settingKey: "editorCommand"
     label: "External editor command"

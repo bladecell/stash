@@ -168,15 +168,39 @@ QtObject {
     }));
   }
 
-  function copyText(text, done) {
-    DMSService.sendRequest("clipboard.copy", { "text": text }, _after(done));
+  // secret: drop the entry DMS records into history (the clipboard itself keeps the text).
+  function copyText(text, done, secret) {
+    DMSService.sendRequest("clipboard.copy", { "text": text }, _after(() => {
+      if (secret)
+        _forget(text);
+      done && done();
+    }));
   }
 
-  function pasteText(text, terminal, beforePaste, delay) {
+  function pasteText(text, terminal, beforePaste, delay, secret) {
     copyText(text, () => {
       beforePaste && beforePaste();
       _schedulePaste(terminal, delay);
+    }, secret);
+  }
+
+  // DMS records new clipboard content asynchronously; look for it a few times.
+  function _forget(text, tries) {
+    const want = text.replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!want)
+      return;
+    const t = Qt.createQmlObject("import QtQuick; Timer { interval: 300 }", root);
+    t.triggered.connect(() => {
+      t.destroy();
+      DMSService.sendRequest("clipboard.search", { "limit": 5, "offset": 0 }, r => {
+        const e = ((r.result || {}).entries || []).find(x => !x.isImage && (x.preview || "").replace(/\s+/g, " ").trim().startsWith(want));
+        if (e)
+          DMSService.sendRequest("clipboard.deleteEntry", { "id": e.id }, () => {});
+        else if ((tries || 0) < 5)
+          root._forget(text, (tries || 0) + 1);
+      });
     });
+    t.start();
   }
 
   // Newest-first history entry n (1-based), fetched fresh so it is right even while the window is closed.

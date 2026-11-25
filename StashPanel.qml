@@ -8,7 +8,7 @@ Rectangle {
   property var store
   signal closeRequested
   signal pasteRequested(var entry, bool textOnly)
-  signal externalRequested(string text, string ext, var onSave)
+  signal externalRequested(string text, string ext, var onSave, bool secret)
   signal commandRequested(var entry, var cmd)
   property var commands: []
 
@@ -61,7 +61,7 @@ Rectangle {
     { id: "email", label: "Emails", icon: "envelope" },
     { id: "path", label: "Paths", icon: "folder" }
   ]
-  readonly property var tabs: builtinTabs.concat(store ? store.tabs.map(t => ({ id: "c" + t.id, label: t.name, icon: t.icon, collection: t.id })) : [])
+  readonly property var tabs: builtinTabs.concat(store ? store.tabs.map(t => ({ id: "c" + t.id, label: t.name, icon: t.icon, collection: t.id, encrypted: t.encrypted, locked: t.locked })) : [])
   property int tabIndex: 0
   property int current: 0
   readonly property var tab: tabs[Math.min(tabIndex, tabs.length - 1)]
@@ -71,13 +71,114 @@ Rectangle {
   property string naming: ""        // "" | "new" | "rename" — header turns into a name field
   property int confirmTabDelete: 0  // collection id awaiting a second Ctrl+Shift+Del
 
-  readonly property var baseItems: !history ? [] : tab.collection ? store.filtered(tab.collection, search.text) : history.filtered(tab.id, search.text)
+  // Vault prompt: unlock a locked tab, or set the master passphrase / unlock before encrypting a tab.
+  property string vaultPrompt: ""   // "" | "setup" | "unlock"
+  property int pendingEncrypt: 0
+  property int confirmDecrypt: 0
+  property bool authBusy: false
+  property string authError: ""
+  readonly property string authMode: tab.locked ? "unlock" : vaultPrompt
+
+  function focusAuth() {
+    authError = "";
+    pass1.input.text = "";
+    pass2.input.text = "";
+    pass1.input.forceActiveFocus();
+  }
+
+  // Tab moves between the setup fields; other routed keys (Ctrl+Tab, Tab in unlock, Ctrl+L…) act as usual.
+  function authKey(event) {
+    if (event.key === Qt.Key_Tab && !(event.modifiers & Qt.ControlModifier) && authMode === "setup")
+      (pass1.input.activeFocus ? pass2.input : pass1.input).forceActiveFocus();
+    else
+      handleKey(event);
+  }
+
+  function cancelAuth() {
+    if (!vaultPrompt)
+      return closeRequested();
+    vaultPrompt = "";
+    pendingEncrypt = 0;
+    search.forceActiveFocus();
+  }
+
+  function submitAuth() {
+    const p = pass1.input.text;
+    if (authBusy || !p)
+      return;
+    const done = err => {
+      authBusy = false;
+      if (err) {
+        authError = err;
+        pass1.input.selectAll();
+        return;
+      }
+      afterAuth();
+    };
+    if (authMode === "setup") {
+      if (p.length < 8) return authError = "Use at least 8 characters";
+      if (p !== pass2.input.text) return authError = "Passphrases don't match";
+      authBusy = true;
+      store.setMaster(p, done);
+    } else {
+      authBusy = true;
+      store.unlock(p, done);
+    }
+  }
+
+  function afterAuth() {
+    pass1.input.text = "";
+    pass2.input.text = "";
+    authError = "";
+    vaultPrompt = "";
+    if (pendingEncrypt) {
+      const id = pendingEncrypt;
+      pendingEncrypt = 0;
+      doEncrypt(id);
+    }
+    search.forceActiveFocus();
+  }
+
+  function doEncrypt(id) {
+    notify("Encrypting…");
+    store.encryptTab(id, err => notify(err ? "Encryption failed: " + err : "Tab encrypted · Ctrl+L locks"));
+  }
+
+  function toggleEncryption() {
+    if (!tab.collection)
+      return notify("Only Notes, Snippets and your own tabs can be encrypted");
+    if (tab.encrypted) {
+      if (tab.locked)
+        return;
+      if (confirmDecrypt !== tab.collection) {
+        notify("Ctrl+Shift+L again stores this tab unencrypted");
+        confirmDecrypt = tab.collection;
+        return;
+      }
+      confirmDecrypt = 0;
+      store.decryptTab(tab.collection);
+      return notify("Tab is no longer encrypted");
+    }
+    if (!store.hasMaster || !store.unlocked) {
+      pendingEncrypt = tab.collection;
+      vaultPrompt = store.hasMaster ? "unlock" : "setup";
+      return;
+    }
+    doEncrypt(tab.collection);
+  }
+
+  onAuthModeChanged: Qt.callLater(() => authMode ? focusAuth() : search.forceActiveFocus())
+
+  readonly property var baseItems: !history || tab.locked ? [] : tab.collection ? store.filtered(tab.collection, search.text) : history.filtered(tab.id, search.text)
   readonly property var items: draft ? [draft].concat(baseItems) : baseItems
   readonly property var selectedEntry: items[current] || null
   readonly property bool undoable: tab.collection ? !!(store && store.lastDeleted) : !!(history && history.pendingDelete)
 
   onItemsChanged: current = Math.min(current, Math.max(0, items.length - 1))
   onTabIndexChanged: {
+    vaultPrompt = "";
+    pendingEncrypt = 0;
+    confirmDecrypt = 0;
     cancelEdit();
     confirmTabDelete = 0;
     if (store) store.lastDeleted = null;
@@ -87,6 +188,8 @@ Rectangle {
 
   function reset() {
     menuOpen = false;
+    vaultPrompt = "";
+    pendingEncrypt = 0;
     cancelEdit();
     naming = "";
     search.text = "";
@@ -169,12 +272,13 @@ Rectangle {
     else if (e.collection && !e.draft)
       persist(e, text, lang, title);  // keep title/lang typed before Ctrl+O
     const ext = lang || (e.kind === "note" ? "md" : "txt");
+    const secret = !!e.secret || !!(tab.encrypted && e.draft);
     externalRequested(text, ext, t => {
       if (target.draft)
         history.copyText(t, null);  // new clipboard text: each save becomes the clipboard
       else
         persist(target, t, undefined, undefined, ne => target = ne);
-    });
+    }, secret);
   }
 
   function openSelectedExternal() {
@@ -285,8 +389,15 @@ Rectangle {
                 color: Theme.primary
               }
               Icon {
+                visible: !!railItem.modelData.encrypted && !railItem.modelData.locked
+                anchors { right: parent.right; bottom: parent.bottom; margins: 4 }
+                name: "lock"
+                size: 8
+                color: Theme.surfaceVariantText
+              }
+              Icon {
                 anchors.centerIn: parent
-                name: railItem.modelData.icon
+                name: railItem.modelData.locked ? "lock" : railItem.modelData.icon
                 size: 15
                 color: railItem.on ? Theme.primary : Theme.surfaceVariantText
               }
@@ -379,9 +490,65 @@ Rectangle {
       }
     }
 
+    // Vault prompt
+    Item {
+      visible: panel.authMode !== ""
+      anchors { top: header.bottom; left: parent.left; right: parent.right; bottom: footer.top }
+      Column {
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 48, 300)
+        spacing: 10
+        Icon { anchors.horizontalCenter: parent.horizontalCenter; name: "lock"; size: 26; color: Theme.primary }
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.Wrap
+          text: panel.authMode === "setup" ? "Set a master passphrase" : panel.tab.locked ? panel.tab.label + " is locked" : "Unlock to encrypt " + panel.tab.label
+          color: Theme.surfaceText
+          font.family: Theme.fontFamily
+          font.pixelSize: 14
+          font.bold: true
+        }
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.Wrap
+          text: panel.authMode === "setup" ? "One passphrase unlocks every encrypted tab. It can't be recovered if you forget it." : "Enter your master passphrase"
+          color: Theme.surfaceVariantText
+          font.family: Theme.fontFamily
+          font.pixelSize: 12
+        }
+        PassField {
+          id: pass1
+          placeholder: "Passphrase"
+          onSubmitted: panel.submitAuth()
+          onCancelled: panel.cancelAuth()
+          onKeyRouted: event => panel.authKey(event)
+        }
+        PassField {
+          id: pass2
+          visible: panel.authMode === "setup"
+          placeholder: "Repeat passphrase"
+          onSubmitted: panel.submitAuth()
+          onCancelled: panel.cancelAuth()
+          onKeyRouted: event => panel.authKey(event)
+        }
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.Wrap
+          text: panel.authBusy ? "Working…" : panel.authError || ("⏎ " + (panel.authMode === "setup" ? "set passphrase" : "unlock") + " · Esc " + (panel.vaultPrompt ? "cancel" : "close"))
+          color: panel.authError && !panel.authBusy ? Theme.error : Theme.surfaceVariantText
+          font.family: Theme.fontFamily
+          font.pixelSize: 11
+        }
+      }
+    }
+
     // Search
     Rectangle {
       id: searchBox
+      visible: panel.authMode === ""
       anchors { top: header.bottom; topMargin: 10; left: parent.left; right: parent.right; leftMargin: 12; rightMargin: 12 }
       height: 36
       radius: 10
@@ -417,6 +584,7 @@ Rectangle {
 
     ListView {
       id: list
+      visible: panel.authMode === ""
       anchors { top: searchBox.bottom; topMargin: 6; left: parent.left; right: parent.right; bottom: footer.top }
       clip: true
       model: panel.items
@@ -556,7 +724,8 @@ Rectangle {
       Text {
         visible: !panel.confirmTabDelete && !panel.notice
         anchors { right: parent.right; rightMargin: 14; verticalCenter: parent.verticalCenter }
-        text: panel.tab.collection ? "⏎ paste · F2 edit · ^N new · ^K run" : "⏎ paste · F2 edit · ^K run · ^P pin"
+        text: panel.tab.encrypted ? (panel.tab.locked ? "Ctrl+Tab other tabs" : "⏎ paste · F2 edit · ^N new · ^L lock")
+            : panel.tab.collection ? "⏎ paste · F2 edit · ^N new · ^K run" : "⏎ paste · F2 edit · ^K run · ^P pin"
         color: Theme.surfaceVariantText
         font.family: Theme.fontFamily
         font.pixelSize: 11
@@ -576,7 +745,7 @@ Rectangle {
   Timer {
     id: noticeTimer
     interval: 3000
-    onTriggered: panel.notice = ""
+    onTriggered: { panel.notice = ""; panel.confirmDecrypt = 0; }
   }
   function notify(text) {
     notice = text;
@@ -591,7 +760,8 @@ Rectangle {
       notify("Slots hold Notes/Snippets items; unassigned slots paste history item N");
       return;
     }
-    store.setSlot(n, e.dbId);
+    if (!store.setSlot(n, e.dbId))
+      return notify("Encrypted items can't be put on slots");
     notify(n ? "Slot " + n + " now pastes this item" : "Slot cleared");
   }
 
@@ -625,7 +795,7 @@ Rectangle {
     case Qt.Key_Enter:
       if (!e) break;
       if (ctrl) {
-        if (e.collection) history.copyText(e.preview, () => closeRequested());
+        if (e.collection) history.copyText(e.preview, () => closeRequested(), e.secret);
         else history.copy(e, false, () => closeRequested());
       } else {
         pasteRequested(e, !!shift);
@@ -647,6 +817,11 @@ Rectangle {
     case Qt.Key_K:
       if (!ctrl) return;
       openMenu();
+      break;
+    case Qt.Key_L:
+      if (!ctrl) return;
+      if (shift) toggleEncryption();
+      else if (store.unlocked) { store.lock(); notify("Encrypted tabs locked"); }
       break;
     case Qt.Key_T:
       if (!ctrl) return;
