@@ -5,6 +5,7 @@ import qs.Common
 import qs.Services
 import qs.Widgets
 import "Commands.js" as Commands
+import "Classify.js" as C
 
 Item {
   id: root
@@ -147,15 +148,36 @@ Item {
 
   // Ctrl+Shift+V: run the item through every "On paste" command for its kind (in list order), paste the result.
   function pasteProcessed(e) {
-    const todo = (commands || []).filter(c => Commands.onPaste(c) && Commands.appliesTo(c, e.kind));
-    if (e.isImage || !todo.length)
-      return paste(e, true);
     const terminal = terminalTarget;
     hide();
+    processAndPaste(e, terminal, 0);
+  }
+
+  // Global clean paste (niri bind → IPC): the current clipboard through the On paste commands.
+  function pasteCleanClipboard() {
+    if (open)
+      hide();
+    const terminal = history.terminalFocused();
+    DMSService.sendRequest("clipboard.search", { "limit": 1, "offset": 0 }, r => {
+      const e = ((r.result || {}).entries || [])[0];
+      if (!e) return;
+      e.kind = C.kind(e);
+      root.processAndPaste(e, terminal, 250);
+    });
+  }
+
+  // delay: ms before the paste keystroke (longer for global binds, so held modifiers are released)
+  function processAndPaste(e, terminal, delay) {
+    const todo = (commands || []).filter(c => Commands.onPaste(c) && Commands.appliesTo(c, e.kind));
+    if (e.isImage || !todo.length) {
+      if (e.collection) history.pasteText(e.preview || "", terminal, null, delay, e.secret);
+      else history.paste(e, true, terminal, null, delay);
+      return;
+    }
     let i = 0;
     const step = text => {
       if (i >= todo.length)
-        return history.pasteText(text, terminal, null, 0, e.secret);
+        return history.pasteText(text, terminal, null, delay, e.secret);
       const c = todo[i++];
       runner.exec(["timeout", "10", "sh", "-c", c.command], text, (out, err, code) => {
         if (code !== 0) {
@@ -242,6 +264,10 @@ Item {
       if (n < 1 || n > 9) return "slot must be 1-9";
       root.pasteSlot(n);
       return "slot " + n;
+    }
+    function pasteClean(): string {
+      root.pasteCleanClipboard();
+      return "ok";
     }
     function cycle(): string {
       root.cycleCopy();

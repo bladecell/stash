@@ -53,6 +53,15 @@ PluginSettings {
     defaultValue: "Mod+C"
   }
 
+  StringSetting {
+    id: cleanKey
+    settingKey: "cleanPasteKey"
+    label: "Clean paste shortcut"
+    description: "Pastes the current clipboard after running it through the commands marked On paste (Remove tracking, Clean text, …). 'none' skips the bind. Click Write niri binds after changing it"
+    placeholder: "Mod+Alt+V"
+    defaultValue: "Mod+Alt+V"
+  }
+
   Column {
     width: parent.width
     spacing: 6
@@ -67,7 +76,7 @@ PluginSettings {
     Text {
       width: parent.width
       wrapMode: Text.Wrap
-      text: "Writes ~/.config/niri/stash-binds.kdl (Mod+V opens Stash, <modifier>+1–9 paste slots, the copy-older-entry key) and includes it from config.kdl. Keys already bound elsewhere are skipped; if niri rejects the config, nothing changes."
+      text: "Writes ~/.config/niri/stash-binds.kdl (Mod+V opens Stash, <modifier>+1–9 paste slots, the copy-older-entry and clean-paste keys) and includes it from config.kdl. Keys already bound elsewhere are skipped; if niri rejects the config, nothing changes."
       color: Theme.surfaceVariantText
       font.pixelSize: Theme.fontSizeSmall
     }
@@ -91,7 +100,7 @@ PluginSettings {
       id: writer
       property string result: ""
       property bool ok: true
-      command: ["sh", decodeURIComponent(Qt.resolvedUrl("niri-binds.sh").toString().replace(/^file:\/\//, "")), slotMod.value.trim() || "Mod+Alt", cycleKey.value.trim() || "Mod+C"]
+      command: ["sh", decodeURIComponent(Qt.resolvedUrl("niri-binds.sh").toString().replace(/^file:\/\//, "")), slotMod.value.trim() || "Mod+Alt", cycleKey.value.trim() || "Mod+C", cleanKey.value.trim() || "Mod+Alt+V"]
       stdout: StdioCollector { id: out }
       onExited: code => {
         ok = code === 0;
