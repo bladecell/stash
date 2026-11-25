@@ -137,13 +137,18 @@ Item {
       return;
     cycleIndex = (cycleIndex + 1) % cycleList.length;  // wraps back to the original clipboard
     const e = cycleList[cycleIndex];
-    const n = cycleIndex + 1;
     DMSService.sendRequest("clipboard.copyEntry", { "id": e.id }, r => {
       if (r.error)
         ToastService.showError("Stash: " + r.error);
       else
-        ToastService.showInfo("Clipboard #" + n + (e.isImage ? " (image)" : ": " + e.preview.slice(0, 60)));
+        cycleOverlay.flash();
     });
+  }
+
+  CycleOverlay {
+    id: cycleOverlay
+    entries: root.cycleList
+    index: root.cycleIndex
   }
 
   // Ctrl+Shift+V: run the item through every "On paste" command for its kind (in list order), paste the result.
