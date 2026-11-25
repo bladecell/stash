@@ -6,7 +6,7 @@
 // auto: "yes" runs the command on every new clipboard entry it applies to (copy/replace outputs only).
 var defaults = [
   { name: "Open", command: "xdg-open \"$STASH_TEXT\"", output: "none", kinds: "url,path" },
-  { name: "Remove tracking", command: "python3 \"$STASH_DIR/clean-url.py\"", output: "copy", kinds: "url,text" },
+  { name: "Remove tracking", command: "python3 \"$STASH_DIR/clean-url.py\"", output: "copy", kinds: "url,text", auto: "yes" },
   { name: "Format JSON", command: "jq .", output: "copy", kinds: "code,text" },
   { name: "Minify JSON", command: "jq -c .", output: "copy", kinds: "code,text" },
   { name: "Base64 encode", command: "base64 -w0", output: "copy", kinds: "" },

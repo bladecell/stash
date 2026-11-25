@@ -33,19 +33,7 @@ PluginSettings {
     defaultValue: ""
   }
 
-  ListSettingWithInput {
-    settingKey: "commands"
-    label: "Custom commands"
-    description: "Ctrl+K in Stash runs these on the selected item. The text arrives on stdin and in $STASH_TEXT. Output: copy, paste, replace (rewrite the item) or none. Kinds limits the command to item types (text, url, code, email, path, color, note); empty means all. On copy: yes runs it on everything you copy and replaces the entry with the output (copy and replace outputs only)"
-    defaultValue: Commands.defaults
-    fields: [
-      { id: "name", label: "Name", placeholder: "Format JSON", width: 130, required: true },
-      { id: "command", label: "Command", placeholder: "jq .", width: 200, required: true },
-      { id: "output", label: "Output", placeholder: "copy", width: 80, default: "copy" },
-      { id: "kinds", label: "Kinds", placeholder: "all", width: 110 },
-      { id: "auto", label: "On copy", placeholder: "no", width: 70 }
-    ]
-  }
+  CommandsSetting {}
 
   StringSetting {
     id: slotMod
