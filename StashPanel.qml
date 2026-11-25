@@ -9,6 +9,7 @@ Rectangle {
   property var store
   signal closeRequested
   signal pasteRequested(var entry, bool textOnly)
+  signal pasteProcessedRequested(var entry)
   signal externalRequested(string text, string ext, var onSave, bool secret)
   signal commandRequested(var entry, var cmd)
   property var commands: []
@@ -51,7 +52,7 @@ Rectangle {
   }
 
   readonly property var helpKeys: [
-    ["Enter / Shift+Enter", "Paste / paste as plain text"], ["Ctrl+Enter", "Copy without pasting"],
+    ["Enter / Shift+Enter", "Paste / paste as plain text"], ["Ctrl+Enter", "Copy without pasting"], ["Ctrl+Shift+V", "Paste through On paste commands"],
     ["Alt+1–9", "Paste item 1–9"], ["↑ ↓ PgUp PgDn Home End", "Move"],
     ["Tab / Shift+Tab", "Next / previous tab"], ["F2 / Ctrl+E", "Edit (Ctrl+S save, Esc cancel)"],
     ["Ctrl+O", "Open in external editor"], ["Ctrl+N", "New item"], ["Del / Ctrl+Z", "Delete / undo"],
@@ -950,6 +951,10 @@ Rectangle {
     case Qt.Key_Right:
       if (!ctrl) return;
       cycleTab(event.key === Qt.Key_Left ? -1 : 1);
+      break;
+    case Qt.Key_V:
+      if (!ctrl || !shift || !e) return;
+      pasteProcessedRequested(e);
       break;
     case Qt.Key_Return:
     case Qt.Key_Enter:

@@ -9,7 +9,7 @@ ListSetting {
   id: root
   settingKey: "commands"
   label: "Custom commands"
-  description: "Ctrl+K in Stash runs these on the selected item. The text arrives on stdin and in $STASH_TEXT ($STASH_KIND = item kind, $STASH_DIR = plugin folder). Kinds limits a command to item types (text, url, code, email, path, color, note); empty means all. On copy runs it on everything you copy and replaces the entry with the output."
+  description: "Ctrl+K in Stash runs these on the selected item. The text arrives on stdin and in $STASH_TEXT ($STASH_KIND = item kind, $STASH_DIR = plugin folder). Kinds limits a command to item types (text, url, code, email, path, color, note); empty means all. Commands marked on paste run when you paste with Ctrl+Shift+V; Enter pastes the original."
   defaultValue: Commands.defaults
 
   property int editing: -1  // row being edited; items.length = new command
@@ -68,13 +68,13 @@ ListSetting {
           anchors.verticalCenter: parent.verticalCenter
         }
         StyledRect {
-          opacity: Commands.isAuto(modelData) ? 1 : 0
+          opacity: Commands.onPaste(modelData) ? 1 : 0
           width: 72
           height: 20
           radius: 10
           color: Theme.withAlpha(Theme.primary, 0.16)
           anchors.verticalCenter: parent.verticalCenter
-          StyledText { id: badgeText; anchors.centerIn: parent; text: "on copy"; color: Theme.primary; font.pixelSize: Theme.fontSizeSmall }
+          StyledText { id: badgeText; anchors.centerIn: parent; text: "on paste"; color: Theme.primary; font.pixelSize: Theme.fontSizeSmall }
         }
       }
 
@@ -135,17 +135,17 @@ ListSetting {
       commandField.text = cmd.command || "";
       kindsField.text = cmd.kinds || "";
       output = cmd.output || "copy";
-      auto = Commands.isAuto(cmd);
+      auto = Commands.onPaste(cmd);
       error.text = "";
       nameField.forceActiveFocus();
     }
 
-    readonly property bool autoAllowed: output === "copy" || output === "replace"
+    readonly property bool autoAllowed: output !== "none"
 
     function save() {
       if (!nameField.text.trim()) return error.text = "Give the command a name";
       if (!commandField.text.trim()) return error.text = "Enter a shell command";
-      saved({ name: nameField.text.trim(), command: commandField.text.trim(), output: output, kinds: kindsField.text.trim(), auto: auto && autoAllowed ? "yes" : "" });
+      saved({ name: nameField.text.trim(), command: commandField.text.trim(), output: output, kinds: kindsField.text.trim(), onPaste: auto && autoAllowed });
     }
 
     Column {
@@ -188,8 +188,8 @@ ListSetting {
       }
       DToggle {
         width: parent.width
-        text: "Run on copy"
-        description: ed.autoAllowed ? "Runs on everything you copy that matches Kinds and replaces it with the output" : "Only for copy or replace output"
+        text: "Run on Ctrl+Shift+V paste"
+        description: ed.autoAllowed ? "Ctrl+Shift+V in Stash pastes the item after running it through every command with this on (if Kinds match)" : "Not for commands with output none"
         checked: ed.auto && ed.autoAllowed
         enabled: ed.autoAllowed
         onToggled: v => ed.auto = v
