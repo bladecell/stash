@@ -837,7 +837,7 @@ Rectangle {
             width: helpGrid.cellWidth
             spacing: 12
             Text {
-              width: 150
+              width: 180
               text: modelData[0]
               color: Theme.primary
               font.family: Theme.monoFontFamily
@@ -845,7 +845,7 @@ Rectangle {
               elide: Text.ElideRight
             }
             Text {
-              width: helpGrid.cellWidth - 162
+              width: helpGrid.cellWidth - 192
               text: modelData[1]
               color: Theme.surfaceText
               font.family: Theme.fontFamily
