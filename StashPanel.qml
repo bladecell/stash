@@ -26,7 +26,7 @@ Rectangle {
   property string overlay: ""
   property int iconIndex: 0
   readonly property var tabIcons: ["folder", "note-sticky", "code", "terminal", "key", "lock", "star", "heart", "bookmark", "briefcase", "house", "user", "globe", "bolt", "flask", "music", "book", "cart-shopping", "server", "database", "shield", "key-skeleton", "wallet", "graduation-cap", "gamepad", "camera", "calendar", "lightbulb", "rocket", "bug", "cloud", "leaf", "paw", "mug-hot", "chart-line", "list-check", "link", "image", "palette", "envelope", "file-lines", "face-smile"]
-  readonly property int iconCols: 8
+  readonly property int iconCols: 14
 
   function openIconPicker() {
     if (!tab.collection)
@@ -432,9 +432,9 @@ Rectangle {
               Rectangle { anchors.centerIn: parent; width: 20; height: 1; color: Theme.outlineVariant }
             }
             Rectangle {
-              width: 36
-              height: 36
-              radius: 10
+              width: 28
+              height: 28
+              radius: 8
               color: railItem.on ? Theme.withAlpha(Theme.primary, 0.12) : railMouse.containsMouse ? Theme.withAlpha(Theme.surfaceText, 0.06) : "transparent"
               Accessible.name: railItem.modelData.label
               Accessible.role: Accessible.PageTab
@@ -773,7 +773,8 @@ Rectangle {
     Rectangle {
       visible: panel.overlay !== ""
       z: 6
-      anchors { left: parent.left; right: parent.right; bottom: footer.top; margins: 12 }
+      anchors { left: parent.left; bottom: footer.top; margins: 12 }
+      width: panel.overlay === "icons" ? Math.min(parent.width - 24, iconGrid.implicitWidth + 24) : parent.width - 24
       height: Math.min(footer.y - header.height - 24, ovCol.implicitHeight + 20)
       radius: 12
       color: Theme.surfaceContainerHigh
@@ -799,21 +800,22 @@ Rectangle {
           font.pixelSize: 11
         }
         Grid {
+          id: iconGrid
           visible: panel.overlay === "icons"
           columns: panel.iconCols
-          spacing: 4
+          spacing: 2
           Repeater {
             model: panel.overlay === "icons" ? panel.tabIcons : []
             delegate: Rectangle {
               required property string modelData
               required property int index
-              width: 36
-              height: 36
-              radius: 10
+              width: 28
+              height: 28
+              radius: 8
               color: index === panel.iconIndex ? Theme.withAlpha(Theme.primary, 0.16) : "transparent"
               border.width: index === panel.iconIndex ? 1 : 0
               border.color: Theme.primary
-              Icon { anchors.centerIn: parent; name: parent.modelData; size: 15; color: parent.index === panel.iconIndex ? Theme.primary : Theme.surfaceText }
+              Icon { anchors.centerIn: parent; name: parent.modelData; size: 13; color: parent.index === panel.iconIndex ? Theme.primary : Theme.surfaceText }
               MouseArea {
                 anchors.fill: parent
                 onClicked: { store.setTabIcon(panel.tab.collection, parent.modelData); panel.overlay = ""; }
