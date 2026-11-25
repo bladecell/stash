@@ -7,6 +7,7 @@
 var defaults = [
   { name: "Open", command: "xdg-open \"$STASH_TEXT\"", output: "none", kinds: "url,path" },
   { name: "Remove tracking", command: "python3 \"$STASH_DIR/clean-url.py\"", output: "copy", kinds: "url,text", onPaste: true },
+  { name: "Clean text", command: "python3 \"$STASH_DIR/clean-text.py\"", output: "copy", kinds: "text", onPaste: true },
   { name: "Format JSON", command: "jq .", output: "copy", kinds: "code,text" },
   { name: "Minify JSON", command: "jq -c .", output: "copy", kinds: "code,text" },
   { name: "Base64 encode", command: "base64 -w0", output: "copy", kinds: "" },
