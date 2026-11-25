@@ -6,6 +6,7 @@ import Quickshell.Io
 QtObject {
   id: root
   signal finished(var job, string out, string err, int code)
+  readonly property string dir: decodeURIComponent(Qt.resolvedUrl(".").toString().replace("file://", "")).replace(/\/$/, "")
 
   property Component proc: Component {
     Process {
@@ -41,6 +42,6 @@ QtObject {
   function run(job, text, kind) {
     exec(["timeout", "20", "sh", "-c", job.cmd.command], text,
       (out, err, code) => root.finished(job, out, err, code),
-      { "STASH_TEXT": text, "STASH_KIND": kind || "" });
+      { "STASH_TEXT": text, "STASH_KIND": kind || "", "STASH_DIR": dir });
   }
 }
