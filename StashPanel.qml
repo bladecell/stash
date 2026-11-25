@@ -432,9 +432,9 @@ Rectangle {
               Rectangle { anchors.centerIn: parent; width: 20; height: 1; color: Theme.outlineVariant }
             }
             Rectangle {
-              width: 28
-              height: 28
-              radius: 8
+              width: 36
+              height: 36
+              radius: 10
               color: railItem.on ? Theme.withAlpha(Theme.primary, 0.12) : railMouse.containsMouse ? Theme.withAlpha(Theme.surfaceText, 0.06) : "transparent"
               Accessible.name: railItem.modelData.label
               Accessible.role: Accessible.PageTab
@@ -449,9 +449,9 @@ Rectangle {
               }
               Icon {
                 visible: !!railItem.modelData.encrypted && !railItem.modelData.locked
-                anchors { right: parent.right; bottom: parent.bottom; margins: 4 }
+                anchors { right: parent.right; bottom: parent.bottom; margins: 5 }
                 name: "lock"
-                size: 8
+                size: 9
                 color: Theme.surfaceVariantText
               }
               Icon {
